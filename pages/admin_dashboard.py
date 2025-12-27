@@ -6,16 +6,40 @@ from models import TitleBasics, TitleRatings
 
 
 # --- 数据库操作逻辑 ---
-async def update_movie_title(tconst, new_title):
+async def update_movie_details(tconst, new_title, new_year, new_genres):
+    """同时更新电影的标题、年份和类型"""
     async with AsyncSessionLocal() as db:
-        await db.execute(update(TitleBasics).where(TitleBasics.tconst == tconst).values(primaryTitle=new_title))
-        await db.commit()
+        try:
+            # 构建更新语句
+            stmt = (
+                update(TitleBasics)
+                .where(TitleBasics.tconst == tconst)
+                .values(
+                    primaryTitle=new_title,
+                    startYear=new_year,
+                    genres=new_genres
+                )
+            )
+            await db.execute(stmt)
+            await db.commit()
+            return True
+        except Exception as e:
+            print(f"更新失败: {e}")
+            await db.rollback()
+            return False
 
 
 async def delete_movie(tconst):
+    """物理删除电影记录"""
     async with AsyncSessionLocal() as db:
-        await db.execute(delete(TitleBasics).where(TitleBasics.tconst == tconst))
-        await db.commit()
+        try:
+            await db.execute(delete(TitleBasics).where(TitleBasics.tconst == tconst))
+            await db.commit()
+            return True
+        except Exception as e:
+            print(f"删除失败: {e}")
+            await db.rollback()
+            return False
 
 async def get_top_movies(limit=10):
     """查询评分最高的10部电影 (需有评分数据)"""
@@ -122,37 +146,86 @@ def create_admin_page():
 
         # --- 交互函数实现 ---
         async def edit_selected():
+            # 获取当前选中的行
             selected = await grid.get_selected_rows()
             if not selected:
-                return ui.notify('请先选中一行数据', type='warning')
+                ui.notify('请先在表格中选中一行', type='warning', position='center')
+                return
 
+            row = selected[0]  # 获取行数据字典
+
+            # 创建弹窗
             with ui.dialog() as dialog, ui.card().classes('w-96'):
-                ui.label('📝 修改电影信息').classes('text-h6')
-                name_input = ui.input('新名称', value=selected[0]['primaryTitle']).classes('w-full')
-                with ui.row().classes('w-full justify-end'):
-                    ui.button('取消', on_click=dialog.close).props('flat')
-                    ui.button('更新', on_click=lambda: do_update(selected[0]['tconst'], name_input.value, dialog))
+                ui.label(f'📝 编辑: {row["tconst"]}').classes('text-h6 font-bold')
 
-        async def do_update(tconst, title, dialog):
-            await update_movie_title(tconst, title)
-            dialog.close()
-            ui.notify('更新成功', type='positive')
-            await load_dashboard_data()
+                # 表单输入框 (绑定默认值为当前行的数据)
+                name_input = ui.input('电影名称', value=row['primaryTitle']).classes('w-full')
+
+                # 年份需要处理空值，防止报错
+                default_year = row['startYear'] if row['startYear'] and row['startYear'] != 'None' else None
+                year_input = ui.number('上映年份', value=default_year, format='%.0f').classes('w-full')
+
+                genres_input = ui.input('类型 (逗号分隔)', value=row['genres']).classes('w-full')
+
+                # 底部按钮栏
+                with ui.row().classes('w-full justify-end q-mt-md'):
+                    ui.button('取消', on_click=dialog.close).props('flat text-color=grey')
+                    ui.button('保存修改', on_click=lambda: do_save(dialog)).props('unelevated color=primary')
+
+            # 定义保存动作
+            async def do_save(dlg):
+                # 数据清洗：年份必须转为整数
+                try:
+                    new_year = int(year_input.value) if year_input.value else None
+                except ValueError:
+                    ui.notify('年份必须是数字', type='negative')
+                    return
+
+                # 调用后端更新
+                success = await update_movie_details(
+                    row['tconst'],
+                    name_input.value,
+                    new_year,
+                    genres_input.value
+                )
+
+                if success:
+                    dlg.close()
+                    ui.notify('修改成功！数据已更新', type='positive')
+                    await load_dashboard_data()  # 刷新表格显示最新数据
+                else:
+                    ui.notify('保存失败，请检查系统日志', type='negative')
+
+            dialog.open()  # 💡 必须调用 open() 才能显示弹窗
 
         async def delete_selected():
             selected = await grid.get_selected_rows()
-            if not selected: return
-            with ui.dialog() as confirm, ui.card():
-                ui.label('⚠️ 确定要删除这部电影吗？').classes('text-bold')
-                with ui.row():
-                    ui.button('取消', on_click=confirm.close)
-                    ui.button('确定', color='red', on_click=lambda: do_delete(selected[0]['tconst'], confirm))
+            if not selected:
+                ui.notify('请先选中要删除的电影', type='warning', position='center')
+                return
 
-        async def do_delete(tconst, dialog):
-            await delete_movie(tconst)
-            dialog.close()
-            ui.notify('已删除', type='negative')
-            await load_dashboard_data()
+            row = selected[0]
+
+            # 创建确认弹窗
+            with ui.dialog() as dialog, ui.card().classes('q-pa-md'):
+                ui.label('⚠️ 危险操作').classes('text-h6 text-red font-bold')
+                ui.label(f'确定要永久下架电影 "{row["primaryTitle"]}" 吗？').classes('q-py-md text-lg')
+
+                with ui.row().classes('w-full justify-end'):
+                    ui.button('手滑了', on_click=dialog.close).props('flat')
+                    ui.button('确定下架', color='red', on_click=lambda: do_delete(row['tconst'], dialog))
+
+            dialog.open()
+
+            # 执行删除
+        async def do_delete(tconst, dlg):
+            success = await delete_movie(tconst)
+            dlg.close()
+            if success:
+                ui.notify(f'电影 {tconst} 已成功下架', type='positive')
+                await load_dashboard_data()  # 刷新数据
+            else:
+                ui.notify('删除失败', type='negative')
 
         # --- 异步加载数据 ---
         async def load_dashboard_data():
