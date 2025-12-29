@@ -1,21 +1,26 @@
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, Numeric
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 
 
 # 1. 电影基本信息表 (title_basics)
 class TitleBasics(Base):
-    __tablename__ = "title_basics"  # 确保表名和数据库一致
+    __tablename__ = "title_basics"
 
     # Column("数据库里的列名", 类型, ...)
-    # 这里的第一个参数必须完全匹配你刚才发的表结构截图
     tconst = Column("tconst", String, primary_key=True, index=True)
-    titleType = Column("titletype", String)  # 假设数据库里是小写
-    primaryTitle = Column("primarytitle", String)  # 假设数据库里是小写
+    titleType = Column("titletype", String)
+    primaryTitle = Column("primarytitle", String)
     originalTitle = Column("originaltitle", String)
-    isAdult = Column("isadult", Boolean)
+
+    # 之前修正的 isAdult
+    isAdult = Column("isadult", Integer)
+
     startYear = Column("startyear", Integer)
-    endYear = Column("endyear", String)
+
+    # 【本次修正】将 String 改为 Integer
+    endYear = Column("endyear", Integer)
+
     runtimeMinutes = Column("runtimeminutes", Integer)
     genres = Column("genres", String)
 
@@ -27,13 +32,8 @@ class TitleBasics(Base):
 class TitleRatings(Base):
     __tablename__ = "title_ratings"
 
-    # 注意：你的截图显示 averagerating 是 numeric 类型，numvotes 是 int4
     tconst = Column("tconst", String, ForeignKey("title_basics.tconst"), primary_key=True)
-
-    # 关键修改：显式指定数据库列名为全小写的 "averagerating"
     averageRating = Column("averagerating", Float)
-
-    # 关键修改：显式指定数据库列名为全小写的 "numvotes"
     numVotes = Column("numvotes", Integer)
 
     movie = relationship("TitleBasics", back_populates="rating")

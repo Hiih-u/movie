@@ -44,7 +44,11 @@ def create_admin_page():
         ui.label('📋 电影资源管理').classes('text-h5 q-mt-xl q-mb-sm self-start font-bold')
 
         with ui.card().classes('w-full q-pa-none shadow-lg'):
+            # --- 按钮栏 ---
             with ui.row().classes('q-pa-sm gap-2'):
+                # 【新增功能入口】
+                ui.button('新增电影', icon='add', on_click=lambda: open_add_dialog()).props('unelevated color=green')
+
                 ui.button('编辑', icon='edit', on_click=lambda: edit_selected()).props('flat color=blue')
                 ui.button('下架电影', icon='delete_forever', on_click=lambda: delete_selected()).props('flat color=red')
 
@@ -71,6 +75,52 @@ def create_admin_page():
             if page_state['current_page'] < 1: page_state['current_page'] = 1
             await load_dashboard_data()
 
+        # --- 1. 新增功能实现 ---
+        async def open_add_dialog():
+            with ui.dialog() as dialog, ui.card().classes('w-96'):
+                ui.label('✨ 新增电影').classes('text-h6 font-bold text-green')
+
+                # 输入框
+                id_input = ui.input('编号 (如 tt9999999)', placeholder='必须唯一').classes('w-full')
+                name_input = ui.input('电影名称').classes('w-full')
+                year_input = ui.number('上映年份', format='%.0f').classes('w-full')
+                genres_input = ui.input('类型 (逗号分隔)', placeholder='Action,Drama').classes('w-full')
+
+                with ui.row().classes('w-full justify-end q-mt-md'):
+                    ui.button('取消', on_click=dialog.close).props('flat text-color=grey')
+                    ui.button('确认添加', on_click=lambda: do_create(dialog)).props('unelevated color=green')
+
+            async def do_create(dlg):
+                # 简单的前端校验
+                if not id_input.value or not name_input.value:
+                    ui.notify('编号和名称不能为空', type='warning')
+                    return
+
+                try:
+                    year_val = int(year_input.value) if year_input.value else None
+                except:
+                    ui.notify('年份格式不正确', type='warning')
+                    return
+
+                # 调用后端
+                success, msg = await movie_service.create_movie(
+                    id_input.value,
+                    name_input.value,
+                    year_val,
+                    genres_input.value
+                )
+
+                if success:
+                    dlg.close()
+                    ui.notify(msg, type='positive')
+                    # 刷新数据以显示新添加的行
+                    await load_dashboard_data()
+                else:
+                    ui.notify(msg, type='negative')
+
+            dialog.open()
+
+        # --- 2. 编辑功能实现 ---
         async def edit_selected():
             selected = await grid.get_selected_rows()
             if not selected:
@@ -117,6 +167,7 @@ def create_admin_page():
 
             dialog.open()
 
+        # --- 3. 删除功能实现 ---
         async def delete_selected():
             selected = await grid.get_selected_rows()
             if not selected:
