@@ -37,3 +37,11 @@ class TitleRatings(Base):
     numVotes = Column("numvotes", Integer)
 
     movie = relationship("TitleBasics", back_populates="rating")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)  # 存加密后的乱码
