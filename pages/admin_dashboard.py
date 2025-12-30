@@ -9,25 +9,13 @@ def create_admin_page():
         ui.label('IMDB 后台管理').classes('text-h6 q-pa-md font-bold text-primary')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
-            # 【当前页高亮】
             ui.button('仪表盘', icon='dashboard').classes('w-full shadow-sm bg-white text-primary').props('flat')
-
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
                 'w-full').props('flat')
-
-            # 【新链接】
             ui.button('电影管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
                 'w-full').props('flat')
-
-            ui.button('算法管理', icon='auto_awesome').classes('w-full').props('flat')
-            ui.button('系统日志', icon='assignment').classes('w-full').props('flat')
-
-            ui.separator().classes('q-my-md')
-            ui.button('退出登录', icon='logout',
-                      on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))).classes(
-                'w-full text-red').props('flat')
 
     # 2. 主内容区 (纯可视化)
     with ui.column().classes('w-full q-pa-md items-center'):

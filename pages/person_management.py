@@ -16,25 +16,17 @@ def create_person_page():
                 'flat')
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')
-
-            # 【新增】演职人员管理入口
             ui.button('演职人员', icon='badge').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            ui.button('电影管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
+                'w-full').props('flat')
 
-            ui.button('算法管理', icon='auto_awesome').classes('w-full').props('flat')
-            ui.separator().classes('q-my-md')
-
-            def logout():
-                app.storage.user.clear()
-                ui.navigate.to('/login')
-
-            ui.button('退出登录', icon='logout', on_click=logout).classes('w-full text-red').props('flat')
 
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
         # 标题栏
         with ui.row().classes('w-full justify-between items-center q-mb-lg'):
             ui.label('🎭 演职人员管理').classes('text-h4 font-bold')
-            ui.button('刷新', icon='refresh', on_click=lambda: load_data()).props('unelevated rounded color=primary')
+            ui.button('刷新列表', icon='refresh', on_click=lambda: load_data()).props('unelevated rounded color=primary')
 
         # 表格区域
         with ui.card().classes('w-full shadow-lg q-pa-none'):

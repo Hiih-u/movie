@@ -70,7 +70,6 @@ def admin_people():
         ui.navigate.to('/login')
         return
 
-    # 右上角用户信息
     with ui.row().classes('absolute-top-right z-50 q-pa-sm'):
         ui.label(f"用户: {app.storage.user.get('username')}").classes('self-center q-mr-sm')
         ui.button('退出', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout').props('flat dense color=red')
@@ -85,9 +84,10 @@ def admin_movies():
         ui.navigate.to('/login')
         return
 
-    # 顶部用户信息栏 (可选)
     with ui.row().classes('absolute-top-right z-50 q-pa-sm'):
-        ui.label(f"用户: {app.storage.user.get('username')}")
+        ui.label(f"用户: {app.storage.user.get('username')}").classes('self-center q-mr-sm')
+        ui.button('退出', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout').props(
+            'flat dense color=red')
 
     movie_management.create_movie_page()
 

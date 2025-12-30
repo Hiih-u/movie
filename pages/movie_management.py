@@ -18,16 +18,7 @@ def create_movie_page():
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
                 'w-full').props('flat')
-
-            # 【当前页高亮】
             ui.button('电影管理', icon='movie').classes('w-full shadow-sm bg-white text-primary').props('flat')
-
-            ui.button('算法管理', icon='auto_awesome').classes('w-full').props('flat')
-
-            ui.separator().classes('q-my-md')
-            ui.button('退出登录', icon='logout',
-                      on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))).classes(
-                'w-full text-red').props('flat')
 
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
