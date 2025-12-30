@@ -1,6 +1,6 @@
 from nicegui import ui, app
 import plotly.graph_objects as go
-from services import movie_service
+from services import analysis_service
 
 
 def create_admin_page():
@@ -55,12 +55,12 @@ def create_admin_page():
         async def load_stats():
             try:
                 # 1. 统计概览
-                count, avg = await movie_service.get_stats_summary()
+                count, avg = await analysis_service.get_stats_summary()
                 total_label.text = f"{count:,}"
                 avg_label.text = f"{avg}"
 
                 # 2. Top 10 图表
-                top_movies = await movie_service.get_top_movies()
+                top_movies = await analysis_service.get_top_movies()
                 chart_container_1.clear()
                 with chart_container_1:
                     ui.label('🏆 评分最高榜单 (Top 10)').classes('font-bold q-pa-sm')
@@ -72,7 +72,7 @@ def create_admin_page():
                         ui.plotly(fig1).classes('w-full')
 
                 # 3. 年度趋势图表
-                year_stats = await movie_service.get_year_stats()
+                year_stats = await analysis_service.get_year_stats()
                 chart_container_2.clear()
                 with chart_container_2:
                     ui.label('📈 电影产量年度趋势').classes('font-bold q-pa-sm')

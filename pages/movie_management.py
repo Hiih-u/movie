@@ -73,7 +73,7 @@ def create_movie_page():
     async def load_data():
         try:
             # 获取总数用于显示页码 (这里暂时用 stats_summary 里的总数)
-            total_count, _ = await movie_service.get_stats_summary()
+            total_count = await movie_service.get_movie_count()
             total_pages = math.ceil(total_count / page_state['page_size'])
 
             print(f"加载第 {page_state['current_page']} 页数据...")
