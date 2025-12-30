@@ -20,7 +20,7 @@ def create_admin_page():
     # 2. 主内容区 (纯可视化)
     with ui.column().classes('w-full q-pa-md items-center'):
         # 顶部标题栏
-        with ui.row().classes('w-full justify-between items-center q-mb-lg'):
+        with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
             ui.label('📊 电影大数据分析终端').classes('text-h4 font-bold')
             ui.button('刷新数据', icon='refresh', on_click=lambda: load_stats()).props(
                 'unelevated rounded color=primary')

@@ -23,7 +23,7 @@ def create_movie_page():
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
         # 3.1 标题栏
-        with ui.row().classes('w-full justify-between items-center q-mb-lg'):
+        with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
             ui.label('🎬 电影资源管理').classes('text-h4 font-bold')
             ui.button('刷新列表', icon='refresh', on_click=lambda: load_data()).props(
                 'unelevated rounded color=primary')

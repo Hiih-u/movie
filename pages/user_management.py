@@ -28,7 +28,7 @@ def create_user_page():
     with ui.column().classes('w-full q-pa-md items-center'):
 
         # 3.1 标题栏
-        with ui.row().classes('w-full justify-between items-center q-mb-lg'):
+        with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
             ui.label('👥 系统用户管理').classes('text-h4 font-bold')
             # 点击刷新，重置到当前页加载
             ui.button('刷新列表', icon='refresh', on_click=lambda: load_users()).props(
