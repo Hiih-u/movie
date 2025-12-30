@@ -48,4 +48,4 @@ def index():
 
 # --- 启动配置 ---
 # 注意：必须加 storage_secret 才能用 Session
-ui.run(title='Movie System', storage_secret='jflajsdfoisaiofogklsl',port=61081)
+ui.run(title='Movie System', storage_secret='jflajsdfoisaiofogklsdfl',port=61081)
