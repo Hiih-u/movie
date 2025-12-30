@@ -45,3 +45,16 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)  # 存加密后的乱码
+
+
+# 3. 演职人员表 (name_basics)
+class NameBasics(Base):
+    __tablename__ = "name_basics"
+
+    # 对应数据库字段
+    nconst = Column("nconst", String, primary_key=True, index=True)
+    primaryName = Column("primaryname", String)
+    birthYear = Column("birthyear", Integer)
+    deathYear = Column("deathyear", Integer)
+    primaryProfession = Column("primaryprofession", String)
+    knownForTitles = Column("knownfortitles", String)

@@ -1,8 +1,7 @@
 # main.py
 from fastapi import FastAPI
 from nicegui import ui, app
-from pages import admin_dashboard, login_page  # 引入新页面
-from pages import admin_dashboard, login_page, user_management
+from pages import admin_dashboard, login_page, user_management, person_management
 
 # 定义 FastAPI
 app_fastapi = FastAPI()
@@ -61,6 +60,22 @@ def admin_users():
         ui.button('退出', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout').props('flat dense color=red')
 
     user_management.create_user_page()
+
+# --- 新增：演职人员管理页路由 ---
+@ui.page('/admin/people')
+def admin_people():
+    # 鉴权
+    if not app.storage.user.get('authenticated', False):
+        ui.notify('请先登录！', type='warning')
+        ui.navigate.to('/login')
+        return
+
+    # 右上角用户信息
+    with ui.row().classes('absolute-top-right z-50 q-pa-sm'):
+        ui.label(f"用户: {app.storage.user.get('username')}").classes('self-center q-mr-sm')
+        ui.button('退出', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout').props('flat dense color=red')
+
+    person_management.create_person_page()
 
 
 # --- 启动配置 ---

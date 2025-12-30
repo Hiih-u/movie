@@ -19,6 +19,8 @@ def create_user_page():
             ui.button('仪表盘', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
                 'flat')
             ui.button('用户管理', icon='people').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
+                'w-full').props('flat')
             ui.separator().classes('q-my-md')
 
             def logout():
@@ -56,7 +58,7 @@ def create_user_page():
                 'rowData': [],
                 'rowSelection': 'single',
                 'pagination': True,
-            }).classes('h-96 w-full shadow-lg')
+            }).classes('w-full shadow-lg').style('height: 70vh')
 
             # (3) 底部翻页控制条
             with ui.row().classes('w-full justify-center items-center q-pa-sm gap-4 bg-gray-50 border-t'):
@@ -103,7 +105,6 @@ def create_user_page():
                 for u in users
             ]
 
-            print(f"格式化数据: {rows}")
             # 6. 更新表格
             await grid.run_grid_method('setGridOption', 'rowData', rows)
 

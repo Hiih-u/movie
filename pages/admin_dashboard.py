@@ -17,6 +17,8 @@ def create_admin_page():
             ui.button('仪表盘', icon='dashboard').classes('w-full shadow-sm').props('flat')
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')
+            ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
+                'w-full').props('flat')
             ui.button('算法管理', icon='auto_awesome').classes('w-full').props('flat')
             ui.button('系统日志', icon='assignment').classes('w-full').props('flat')
 
