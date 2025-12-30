@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from nicegui import ui, app
 from pages import admin_dashboard, login_page  # 引入新页面
+from pages import admin_dashboard, login_page, user_management
 
 # 定义 FastAPI
 app_fastapi = FastAPI()
@@ -44,6 +45,22 @@ def admin():
 def index():
     ui.label('这是前台首页')
     ui.link('去后台', '/admin')
+
+# --- 新增：用户管理页路由 ---
+@ui.page('/admin/users')
+def admin_users():
+    # 鉴权守卫 (和 /admin 保持一致)
+    if not app.storage.user.get('authenticated', False):
+        ui.notify('请先登录！', type='warning')
+        ui.navigate.to('/login')
+        return
+
+    # 右上角用户信息条 (可选，保持统一体验)
+    with ui.row().classes('absolute-top-right z-50 q-pa-sm'):
+        ui.label(f"用户: {app.storage.user.get('username')}").classes('self-center q-mr-sm')
+        ui.button('退出', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout').props('flat dense color=red')
+
+    user_management.create_user_page()
 
 
 # --- 启动配置 ---
