@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI
 from nicegui import ui, app
-from pages import admin_dashboard, login_page, user_management, person_management, movie_management
+from pages import admin_dashboard, login_page, user_management, person_management, movie_management, rating_management
 
 # 定义 FastAPI
 app_fastapi = FastAPI()
@@ -90,6 +90,21 @@ def admin_movies():
             'flat dense color=red')
 
     movie_management.create_movie_page()
+
+@ui.page('/admin/ratings')
+def admin_ratings():
+    # 鉴权
+    if not app.storage.user.get('authenticated', False):
+        ui.notify('请先登录！', type='warning')
+        ui.navigate.to('/login')
+        return
+
+    # 右上角用户信息条
+    with ui.row().classes('absolute-top-right z-50 q-pa-sm'):
+        ui.label(f"用户: {app.storage.user.get('username')}").classes('self-center q-mr-sm')
+        ui.button('退出', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout').props('flat dense color=red')
+
+    rating_management.create_rating_page()
 
 # --- 启动配置 ---
 # 注意：必须加 storage_secret 才能用 Session
