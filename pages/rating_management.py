@@ -22,6 +22,8 @@ def create_rating_page():
                 'w-full').props('flat')
             # 当前页面高亮
             ui.button('评分管理', icon='star').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            ui.button('剧组管理', icon='star', on_click=lambda: ui.navigate.to('/admin/crew')).classes(
+                'w-full').props('flat')
 
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
@@ -50,7 +52,7 @@ def create_rating_page():
                 ],
                 'rowData': [],
                 'rowSelection': 'single',
-                'pagination': True,
+                'pagination': False,
             }).classes('w-full shadow-lg').style('height: 70vh')
 
             # 分页控件

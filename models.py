@@ -26,7 +26,7 @@ class TitleBasics(Base):
 
     # 关联配置
     rating = relationship("TitleRatings", back_populates="movie", uselist=False)
-
+    crew = relationship("TitleCrew", back_populates="movie", uselist=False)
 
 # 2. 电影评分表 (title_ratings)
 class TitleRatings(Base):
@@ -58,3 +58,18 @@ class NameBasics(Base):
     deathYear = Column("deathyear", Integer)
     primaryProfession = Column("primaryprofession", String)
     knownForTitles = Column("knownfortitles", String)
+
+
+# 【新增】3. 剧组信息表 (title_crew)
+class TitleCrew(Base):
+    __tablename__ = "title_crew"
+
+    # tconst 作为主键，同时也是外键指向 title_basics
+    tconst = Column("tconst", String, ForeignKey("title_basics.tconst"), primary_key=True)
+
+    # 导演和编剧通常是逗号分隔的字符串 (如 "nm00001,nm00002")
+    directors = Column("directors", String)
+    writers = Column("writers", String)
+
+    # 关联回电影主表
+    movie = relationship("TitleBasics", back_populates="crew")
