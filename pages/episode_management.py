@@ -1,13 +1,13 @@
 from nicegui import ui, app
-from services import crew_service
+from services import episode_service
 import math
 
 
-def create_crew_page():
+def create_episode_page():
     # --- 1. 状态管理 ---
     page_state = {'current_page': 1, 'page_size': 20}
 
-    # --- 2. 侧边栏 ---
+    # --- 2. 侧边栏 (导航) ---
     with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900'):
         ui.label('IMDB 后台管理').classes('text-h6 q-pa-md font-bold text-primary')
         ui.separator()
@@ -22,15 +22,16 @@ def create_crew_page():
                 'w-full').props('flat')
             ui.button('评分管理', icon='star', on_click=lambda: ui.navigate.to('/admin/ratings')).classes(
                 'w-full').props('flat')
-            ui.button('剧组管理', icon='groups').classes('w-full shadow-sm bg-white text-primary').props('flat')
-            ui.button('剧集管理', icon='subscriptions', on_click=lambda: ui.navigate.to('/admin/episodes')).classes(
+            ui.button('剧组管理', icon='groups', on_click=lambda: ui.navigate.to('/admin/crew')).classes(
                 'w-full').props('flat')
+            # 当前页高亮
+            ui.button('剧集管理', icon='subscriptions').classes('w-full shadow-sm bg-white text-primary').props('flat')
 
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
         # 标题栏
         with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
-            ui.label('🎬 剧组信息管理 (Crew)').classes('text-h4 font-bold')
+            ui.label('📺 剧集/分集管理 (Episodes)').classes('text-h4 font-bold')
             ui.button('刷新列表', icon='refresh', on_click=lambda: load_data()).props(
                 'unelevated rounded color=primary')
 
@@ -42,13 +43,14 @@ def create_crew_page():
                 ui.button('编辑', icon='edit', on_click=lambda: edit_selected()).props('flat color=blue')
                 ui.button('删除', icon='delete', on_click=lambda: delete_selected()).props('flat color=red')
 
-            # 表格定义
+            # AgGrid 表格定义
             grid = ui.aggrid({
                 'columnDefs': [
-                    {'headerName': '电影编号', 'field': 'tconst', 'checkboxSelection': True},
-                    {'headerName': '电影名称', 'field': 'title'},
-                    {'headerName': '导演 (nconst)', 'field': 'directors'},
-                    {'headerName': '编剧 (nconst)', 'field': 'writers'},
+                    {'headerName': '本集编号 (tconst)', 'field': 'tconst', 'checkboxSelection': True},
+                    {'headerName': '父级编号 (parent)', 'field': 'parentTconst'},
+                    {'headerName': '所属剧集名称', 'field': 'parentTitle'},
+                    {'headerName': '季 (Season)', 'field': 'seasonNumber'},
+                    {'headerName': '集 (Episode)', 'field': 'episodeNumber'},
                 ],
                 'rowData': [],
                 'rowSelection': 'single',
@@ -64,22 +66,23 @@ def create_crew_page():
     # --- 4. 逻辑处理 ---
     async def load_data():
         try:
-            total = await crew_service.get_crew_count() or 0
+            total = await episode_service.get_episode_count() or 0
             total_pages = math.ceil(total / page_state['page_size']) if total > 0 else 1
             if page_state['current_page'] > total_pages: page_state['current_page'] = total_pages
 
             # 获取数据
-            data_list = await crew_service.get_crew_paginated(page_state['current_page'], page_state['page_size'])
+            data_list = await episode_service.get_episodes_paginated(page_state['current_page'],
+                                                                     page_state['page_size'])
 
             rows = []
-            for crew_obj, movie_name in data_list:
+            for ep_obj, parent_title in data_list:
                 rows.append({
-                    'tconst': crew_obj.tconst,
-                    'title': movie_name,
-                    'directors': crew_obj.directors,
-                    'writers': crew_obj.writers
+                    'tconst': ep_obj.tconst,
+                    'parentTconst': ep_obj.parentTconst,
+                    'parentTitle': parent_title or '(未知)',
+                    'seasonNumber': ep_obj.seasonNumber,
+                    'episodeNumber': ep_obj.episodeNumber
                 })
-            print(rows)
 
             await grid.run_grid_method('setGridOption', 'rowData', rows)
 
@@ -97,31 +100,34 @@ def create_crew_page():
     def open_edit_dialog(data=None):
         is_edit = data is not None
         with ui.dialog() as dialog, ui.card().classes('w-96'):
-            ui.label('编辑信息' if is_edit else '新增信息').classes('text-h6 font-bold')
+            ui.label('编辑信息' if is_edit else '新增剧集信息').classes('text-h6 font-bold')
 
-            tconst_input = ui.input('电影编号 (tconst)', value=data['tconst'] if is_edit else '').classes('w-full')
-            if is_edit: tconst_input.disable()
+            tconst_input = ui.input('本集编号 (tconst)', value=data['tconst'] if is_edit else '').classes('w-full')
+            if is_edit: tconst_input.disable()  # ID不可改
 
-            dir_input = ui.input('导演 (nconst, 逗号分隔)', value=data['directors'] if is_edit else '').classes(
+            parent_input = ui.input('父级剧集编号 (parentTconst)',
+                                    value=data['parentTconst'] if is_edit else '').classes('w-full')
+            season_input = ui.number('第几季', value=data['seasonNumber'] if is_edit else None, format='%.0f').classes(
                 'w-full')
-            writer_input = ui.input('编剧 (nconst, 逗号分隔)', value=data['writers'] if is_edit else '').classes(
-                'w-full')
+            episode_input = ui.number('第几集', value=data['episodeNumber'] if is_edit else None,
+                                      format='%.0f').classes('w-full')
 
             async def save():
-                if not tconst_input.value:
-                    ui.notify('电影编号必填', type='warning')
+                if not tconst_input.value or not parent_input.value:
+                    ui.notify('本集编号和父级编号必填', type='warning')
                     return
 
                 kwargs = {
                     'tconst': tconst_input.value,
-                    'directors': dir_input.value,
-                    'writers': writer_input.value
+                    'parent_tconst': parent_input.value,
+                    'season_number': int(season_input.value) if season_input.value else None,
+                    'episode_number': int(episode_input.value) if episode_input.value else None
                 }
 
                 if is_edit:
-                    success, msg = await crew_service.update_crew(**kwargs)
+                    success, msg = await episode_service.update_episode(**kwargs)
                 else:
-                    success, msg = await crew_service.create_crew(**kwargs)
+                    success, msg = await episode_service.create_episode(**kwargs)
 
                 if success:
                     ui.notify(msg, type='positive')
@@ -147,7 +153,7 @@ def create_crew_page():
         if not rows: return
 
         async def confirm():
-            success, msg = await crew_service.delete_crew(rows[0]['tconst'])
+            success, msg = await episode_service.delete_episode(rows[0]['tconst'])
             if success:
                 ui.notify(msg, type='positive')
                 await load_data()
@@ -155,10 +161,11 @@ def create_crew_page():
                 ui.notify(msg, type='negative')
 
         with ui.dialog() as dialog, ui.card():
-            ui.label(f"确认删除 {rows[0]['tconst']} 的剧组信息?").classes('font-bold text-red')
+            ui.label(f"确认删除剧集 {rows[0]['tconst']}?").classes('font-bold text-red')
             with ui.row().classes('w-full justify-end'):
                 ui.button('取消', on_click=dialog.close).props('flat')
                 ui.button('删除', color='red', on_click=lambda: [confirm(), dialog.close()])
         dialog.open()
 
+    # 初始加载
     ui.timer(0.1, load_data, once=True)

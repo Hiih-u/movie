@@ -73,3 +73,17 @@ class TitleCrew(Base):
 
     # 关联回电影主表
     movie = relationship("TitleBasics", back_populates="crew")
+
+# 【新增】4. 剧集信息表 (title_episode)
+class TitleEpisode(Base):
+    __tablename__ = "title_episode"
+
+    # 根据你提供的表结构
+    tconst = Column("tconst", String, primary_key=True)  # 这一集本身的编号
+    parentTconst = Column("parenttconst", String, index=True) # 父级(剧集)编号
+    seasonNumber = Column("seasonnumber", Integer)
+    episodeNumber = Column("episodenumber", Integer)
+
+    # 建立关联，方便查询时获取 剧集(Series) 的名称
+    # 注意：这里假设 parentTconst 关联到 TitleBasics 的 tconst
+    parent_series = relationship("TitleBasics", foreign_keys=[parentTconst], primaryjoin="TitleEpisode.parentTconst==TitleBasics.tconst", uselist=False)
