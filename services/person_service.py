@@ -1,18 +1,44 @@
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, or_
 from database import AsyncSessionLocal
 from models import NameBasics
 
-async def get_person_count():
-    """获取总人数"""
+
+async def get_person_count(search_query=None):
+    """获取总人数 (支持搜索)"""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(func.count(NameBasics.nconst)))
+        query = select(func.count(NameBasics.nconst))
+
+        # 如果有搜索关键词，添加过滤条件
+        if search_query:
+            query = query.where(
+                or_(
+                    NameBasics.primaryName.ilike(f"%{search_query}%"),  # 模糊匹配姓名
+                    NameBasics.nconst.ilike(f"%{search_query}%")  # 模糊匹配编号
+                )
+            )
+
+        result = await db.execute(query)
         return result.scalar()
 
-async def get_people_paginated(page: int, page_size: int):
-    """分页获取人员列表"""
+
+async def get_people_paginated(page: int, page_size: int, search_query=None):
+    """分页获取人员列表 (支持搜索)"""
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
-        query = select(NameBasics).order_by(NameBasics.nconst).offset(offset).limit(page_size)
+        query = select(NameBasics)
+
+        # 如果有搜索关键词，添加过滤条件
+        if search_query:
+            query = query.where(
+                or_(
+                    NameBasics.primaryName.ilike(f"%{search_query}%"),  # 模糊匹配姓名
+                    NameBasics.nconst.ilike(f"%{search_query}%")  # 模糊匹配编号
+                )
+            )
+
+        # 排序并分页
+        query = query.order_by(NameBasics.nconst).offset(offset).limit(page_size)
+
         result = await db.execute(query)
         return result.scalars().all()
 
