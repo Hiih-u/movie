@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, episode_management
+    crew_management, episode_management, register_page
 )
 
 # 定义 FastAPI
@@ -70,6 +70,14 @@ def login():
 
     login_page.create_login_page()
 
+# 添加注册页路由 (建议放在 /login 附近)
+@ui.page('/register')
+def register():
+    # 如果已登录，没必要注册，踢回首页
+    if app.storage.user.get('authenticated', False):
+        ui.navigate.to('/')
+        return
+    register_page.create_register_page()
 
 # --- 2. 后台管理路由 (全部加上权限锁) ---
 

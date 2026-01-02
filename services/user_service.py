@@ -36,30 +36,30 @@ async def get_users_paginated(page: int, page_size: int, search_query=None):
         return result.scalars().all()
 
 async def create_user(username, password, role='user', gender=None, age=None, occupation=None):
-    """创建新用户 (支持角色和画像)"""
+    """创建新用户 (支持前台注册)"""
     async with AsyncSessionLocal() as db:
-        # 1. 检查用户名是否已存在
+        # 1. 查重
         existing = await db.execute(select(User).where(User.username == username))
         if existing.scalar():
             return False, "用户名已存在"
 
-        # 2. 加密密码并保存
+        # 2. 创建对象
         hashed = get_password_hash(password)
         new_user = User(
             username=username,
             hashed_password=hashed,
-            role=role,             # 【新增】角色
-            gender=gender,         # 【新增】性别
-            age=age,               # 【新增】年龄
-            occupation=occupation  # 【新增】职业
+            role=role,             # 默认为 'user'
+            gender=gender,         # 【新增】
+            age=age,               # 【新增】
+            occupation=occupation  # 【新增】
         )
         db.add(new_user)
         try:
             await db.commit()
-            return True, "创建成功"
+            return True, "注册成功"
         except Exception as e:
             await db.rollback()
-            return False, str(e)
+            return False, f"系统错误: {str(e)}"
 
 
 async def delete_user(user_id):

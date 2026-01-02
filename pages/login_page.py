@@ -43,4 +43,7 @@ def create_login_page():
                 ui.notify(msg, type='negative')
 
         ui.button('登录', on_click=try_login).props('unelevated color=primary').classes('w-full q-mt-md')
-        ui.link('返回首页', '/').classes('text-center block w-full q-mt-sm text-grey')
+        # 【新增】注册引导
+        with ui.row().classes('w-full justify-between items-center q-mt-md text-sm'):
+            ui.link('返回首页', '/').classes('text-grey')
+            ui.link('没有账号？去注册', '/register').classes('text-primary font-bold')
