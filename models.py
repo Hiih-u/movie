@@ -94,3 +94,18 @@ class TitleEpisode(Base):
     # 建立关联，方便查询时获取 剧集(Series) 的名称
     # 注意：这里假设 parentTconst 关联到 TitleBasics 的 tconst
     parent_series = relationship("TitleBasics", foreign_keys=[parentTconst], primaryjoin="TitleEpisode.parentTconst==TitleBasics.tconst", uselist=False)
+
+
+# 【新增】首页高性能缓存表 (把电影信息和评分合二为一)
+class MovieSummary(Base):
+    __tablename__ = "movie_summary"
+
+    tconst = Column(String, primary_key=True, index=True)
+    primaryTitle = Column(String)
+    startYear = Column(Integer)
+    runtimeMinutes = Column(Integer)
+    genres = Column(String)
+
+    # 把评分表的数据也搬过来
+    averageRating = Column(Float)
+    numVotes = Column(Integer, index=True)  # 加索引，排序飞快

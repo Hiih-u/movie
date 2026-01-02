@@ -10,7 +10,7 @@ async def init_models():
     async with engine.begin() as conn:
         # 这一步会创建所有 models.py 里定义但数据库里不存在的表
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ 数据库表结构同步完成！(users 表已创建)")
+    print("✅ 数据库表结构同步完成！")
 
 
 if __name__ == "__main__":

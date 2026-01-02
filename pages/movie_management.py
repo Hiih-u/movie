@@ -9,7 +9,9 @@ def create_movie_page():
 
     # --- 2. 侧边栏 (导航菜单) ---
     with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900'):
-        ui.label('IMDB 后台管理').classes('text-h6 q-pa-md font-bold text-primary')
+        ui.button('回首页', icon='home', on_click=lambda: ui.navigate.to('/')) \
+            .classes('text-h6 font-bold text-primary w-full') \
+            .props('flat align=left no-caps q-pa-md')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
             ui.button('仪表盘', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
@@ -31,8 +33,22 @@ def create_movie_page():
         # 3.1 标题栏 刷新列表按钮下移
         with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
             ui.label('🎬 电影资源管理').classes('text-h4 font-bold')
-            ui.button('刷新列表', icon='refresh', on_click=lambda: load_data()).props(
-                'unelevated rounded color=primary')
+            with ui.row().classes('gap-2'):
+                # 【新增】重建缓存按钮
+                async def do_refresh():
+                    ui.notify('正在后台重建索引，请稍候...', type='info')
+                    success, msg = await movie_service.refresh_movie_summary()
+                    if success:
+                        ui.notify(msg, type='positive')
+                    else:
+                        ui.notify(msg, type='negative')
+
+                ui.button('重建缓存', icon='cloud_sync', on_click=do_refresh) \
+                    .props('outline rounded color=deep-orange') \
+                    .tooltip('点击将重新生成首页的热度排序数据')
+
+                ui.button('刷新列表', icon='refresh', on_click=lambda: load_data()) \
+                    .props('unelevated rounded color=primary shadow-sm')
 
         # 3.2 表格区域
         with ui.card().classes('w-full shadow-lg q-pa-none'):

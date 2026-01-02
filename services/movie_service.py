@@ -1,6 +1,7 @@
-from sqlalchemy import select, func, desc, update, delete, or_
+from sqlalchemy import select, func, desc, update, delete, or_, text
 from database import AsyncSessionLocal
-from models import TitleBasics, TitleRatings
+from models import TitleBasics, TitleRatings, MovieSummary
+
 
 # --- 数据库操作逻辑 (CRUD) ---
 
@@ -109,25 +110,65 @@ async def get_movie_count(search_query=None):
         return result.scalar()
 
 
+# --- 【新增】数据同步功能 (ETL) ---
+async def refresh_movie_summary():
+    """
+    全量刷新 movie_summary 表
+    修正：源表(title_basics, title_ratings)的列名使用小写，目标表(movie_summary)保持模型定义的大小写
+    """
+    async with AsyncSessionLocal() as db:
+        try:
+            # 1. 清空旧表
+            await db.execute(text("TRUNCATE TABLE movie_summary"))
+
+            # 2. 执行插入
+            # 注意：
+            # - INSERT INTO 部分：对应 MovieSummary 表的列名，SQLAlchemy 默认创建为 "primaryTitle" (带引号区分大小写)
+            # - SELECT 部分：对应 title_basics/ratings 表的真实列名，全都是小写！
+            stmt = text("""
+                        INSERT INTO movie_summary (tconst, "primaryTitle", "startYear", "runtimeMinutes", genres,
+                                                   "averageRating", "numVotes")
+                        SELECT b.tconst,
+                               b.primarytitle,   -- 改为小写
+                               b.startyear,      -- 改为小写
+                               b.runtimeminutes, -- 改为小写
+                               b.genres,
+                               r.averagerating,  -- 改为小写
+                               r.numvotes        -- 改为小写
+                        FROM title_basics b
+                                 LEFT JOIN title_ratings r ON b.tconst = r.tconst
+                        WHERE b.titletype = 'movie'
+                        """)
+            await db.execute(stmt)
+            await db.commit()
+            return True, "缓存重建成功！"
+        except Exception as e:
+            await db.rollback()
+            return False, f"同步失败: {e}"
+
+
+# --- 【修改】首页查询接口 (改用新表) ---
 async def get_homepage_movies(page: int, page_size: int, search_query=None):
-    """首页专用：联表查询 + 按热度排序"""
+    """
+    【极速版】首页查询
+    直接查 movie_summary 单表，无需 Join
+    """
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
-        query = (
-            select(TitleBasics, TitleRatings.averageRating)
-            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst, isouter=True)
-        )
+        # 直接查 MovieSummary
+        query = select(MovieSummary)
 
         if search_query:
-            query = query.where(or_(
-                TitleBasics.primaryTitle.ilike(f"%{search_query}%"),
-                TitleBasics.tconst.ilike(f"%{search_query}%")
-            ))
-            query = query.order_by(TitleBasics.tconst)
+            # 这里的字段名要和 MovieSummary 定义的一致
+            query = query.where(MovieSummary.primaryTitle.ilike(f"%{search_query}%"))
+            # 搜索时按匹配度/ID排序
+            query = query.order_by(MovieSummary.tconst)
         else:
-            # 首页默认按投票数倒序
-            query = query.order_by(desc(TitleRatings.numVotes).nulls_last())
+            # 首页默认按热度倒序 (利用 numVotes 索引)
+            query = query.order_by(desc(MovieSummary.numVotes).nulls_last())
 
         query = query.offset(offset).limit(page_size)
         result = await db.execute(query)
-        return result.all() # 返回元组列表
+
+        # 返回的是 MovieSummary 对象列表 (不是元组了！)
+        return result.scalars().all()

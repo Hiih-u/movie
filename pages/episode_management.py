@@ -9,7 +9,9 @@ def create_episode_page():
 
     # --- 2. 侧边栏 (导航) ---
     with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900'):
-        ui.label('IMDB 后台管理').classes('text-h6 q-pa-md font-bold text-primary')
+        ui.button('回首页', icon='home', on_click=lambda: ui.navigate.to('/')) \
+            .classes('text-h6 font-bold text-primary w-full') \
+            .props('flat align=left no-caps q-pa-md')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
             ui.button('仪表盘', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(

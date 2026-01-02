@@ -38,7 +38,8 @@ def create_user_home():
 
                 if user_role == 'admin':
                     ui.button('后台管理', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')) \
-                        .props('unelevated dense color=blue') \
+                        .props('outline rounded-full dense color=primary') \
+                        .classes('px-4') \
                         .tooltip('进入系统后台')
 
                 ui.button(icon='logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))) \
@@ -78,21 +79,18 @@ def create_user_home():
                             if not query:
                                 ui.label('数据来源: IMDb Datasets').classes('text-xs text-slate-400')
 
-                        movies_data = await movie_service.get_homepage_movies(page=1, page_size=24, search_query=query)
+                        movies = await movie_service.get_homepage_movies(page=1, page_size=24, search_query=query)
 
-                        if not movies_data:
+                        if not movies:
                             ui.label('暂无数据').classes('text-slate-400 py-10')
                         else:
                             # Grid 3 列
                             with ui.grid(columns=3).classes('w-full gap-6'):
                                 # 【关键修改】这里要解包 (m, rating)
-                                for index, (m, rating) in enumerate(movies_data):
+                                for index, m in enumerate(movies):
                                     bg = BG_COLORS[index % len(BG_COLORS)]
 
-                                    # 处理评分显示：如果没有评分，显示 'N/A'
-                                    display_rating = str(rating) if rating else 'N/A'
-
-                                    # 处理时长显示：如果是 None 则显示 '?'
+                                    display_rating = str(m.averageRating) if m.averageRating else 'N/A'
                                     display_runtime = f"{m.runtimeMinutes}" if m.runtimeMinutes else "?"
 
                                     with ui.card().classes(
@@ -120,8 +118,7 @@ def create_user_home():
                                             with ui.row().classes(
                                                     'w-full justify-between border-t pt-2 mt-auto items-center'):
                                                 # 真实评分
-                                                ui.label(f'★ {display_rating}').classes(
-                                                    'text-xs font-bold text-orange-500')
+                                                ui.label(f'★ {display_rating}').classes('text-xs font-bold text-orange-500')
                                                 # 真实时长
                                                 ui.label(f'{display_runtime} min').classes('text-xs text-slate-400')
 

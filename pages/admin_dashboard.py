@@ -6,7 +6,9 @@ from services import analysis_service
 def create_admin_page():
     # 1. 侧边栏 (需同步更新)
     with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900'):
-        ui.label('IMDB 后台管理').classes('text-h6 q-pa-md font-bold text-primary')
+        ui.button('回首页', icon='home', on_click=lambda: ui.navigate.to('/')) \
+            .classes('text-h6 font-bold text-primary w-full') \
+            .props('flat align=left no-caps q-pa-md')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
             ui.button('仪表盘', icon='dashboard').classes('w-full shadow-sm bg-white text-primary').props('flat')

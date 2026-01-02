@@ -40,16 +40,13 @@ def admin_header():
     """后台页面统一的右上角头部"""
     # 增加 items-center 让按钮垂直居中
     with ui.row().classes('absolute-top-right z-50 q-pa-sm items-center'):
-        # 【新增】前往前台按钮
-        # props: flat(扁平) dense(紧凑) color=primary(主色) bg-white(白底)
-        ui.button('前往前台', icon='home', on_click=lambda: ui.navigate.to('/')) \
-            .props('flat dense color=primary bg-white') \
-            .classes('q-mr-sm shadow-sm') \
-            .tooltip('返回前台首页')
 
-        # 原有的管理员标签
-        ui.label(f"管理员: {app.storage.user.get('username')}") \
-            .classes('self-center q-mr-sm text-white bg-primary q-px-sm rounded shadow')
+        username = app.storage.user.get('username', 'Admin')
+        with ui.row().classes('items-center gap-3 q-mr-md'):
+            ui.avatar(username[0].upper(), color='primary', text_color='white') \
+                .props('size=sm font-size=14px')
+            ui.label(username).classes('font-medium text-slate-600')
+
 
         # 原有的退出按钮
         ui.button('退出', icon='logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))) \
