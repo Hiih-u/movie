@@ -1,28 +1,54 @@
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, or_
 from database import AsyncSessionLocal
 from models import TitleRatings, TitleBasics
 
-async def get_rating_count():
-    """获取评分总数"""
+
+async def get_rating_count(search_query=None):
+    """获取评分总数 (支持搜索)"""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(func.count(TitleRatings.tconst)))
+        query = select(func.count(TitleRatings.tconst))
+
+        # 如果有搜索内容，需要添加过滤条件
+        if search_query:
+            # 必须联表才能搜到 primaryTitle
+            query = query.join(TitleBasics, TitleRatings.tconst == TitleBasics.tconst)
+            query = query.where(
+                or_(
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%"),  # 搜电影名
+                    TitleRatings.tconst.ilike(f"%{search_query}%")  # 搜编号
+                )
+            )
+
+        result = await db.execute(query)
         return result.scalar()
 
-async def get_ratings_paginated(page: int, page_size: int):
+
+async def get_ratings_paginated(page: int, page_size: int, search_query=None):
     """
-    分页获取评分列表
+    分页获取评分列表 (支持搜索)
     注意：这里我们做了一个联表查询(join)，为了在列表中直接显示电影名字，
     而不是只显示冷冰冰的 tconst 编号。
     """
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
+        # 基础查询 (已经包含了 Join)
         stmt = (
             select(TitleRatings, TitleBasics.primaryTitle)
             .join(TitleBasics, TitleRatings.tconst == TitleBasics.tconst)
-            .order_by(TitleRatings.tconst)
-            .offset(offset)
-            .limit(page_size)
         )
+
+        # 如果有搜索内容，添加过滤条件
+        if search_query:
+            stmt = stmt.where(
+                or_(
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%"),  # 搜电影名
+                    TitleRatings.tconst.ilike(f"%{search_query}%")  # 搜编号
+                )
+            )
+
+        # 排序并分页
+        stmt = stmt.order_by(TitleRatings.tconst).offset(offset).limit(page_size)
+
         result = await db.execute(stmt)
         # 返回的是 [(TitleRatings对象, 电影名字符串), ...] 的列表
         return result.all()
