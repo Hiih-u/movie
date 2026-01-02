@@ -5,27 +5,34 @@ from services.auth_service import get_password_hash  # 复用加密逻辑
 
 
 # 【新增】获取用户总数 (用于前端计算页码)
-async def get_user_count():
+async def get_user_count(search_query=None):
     async with AsyncSessionLocal() as db:
-        # select count(*) from users
-        result = await db.execute(select(func.count(User.id)))
+        query = select(func.count(User.id))
+
+        # 如果有搜索内容，添加过滤条件
+        if search_query:
+            # 模糊匹配用户名 (忽略大小写)
+            query = query.where(User.username.ilike(f"%{search_query}%"))
+
+        result = await db.execute(query)
         return result.scalar()
 
 
-# 【新增】获取分页用户列表
-async def get_users_paginated(page: int, page_size: int):
+# 2. 修改分页查询函数，接收搜索关键词
+async def get_users_paginated(page: int, page_size: int, search_query=None):
     async with AsyncSessionLocal() as db:
-        # 计算跳过多少条
         offset = (page - 1) * page_size
 
-        # 查询逻辑: 排序 -> 跳过 -> 限制数量
-        stmt = (
-            select(User)
-            .order_by(User.id)
-            .offset(offset)
-            .limit(page_size)
-        )
-        result = await db.execute(stmt)
+        query = select(User)
+
+        # 如果有搜索内容，添加过滤条件
+        if search_query:
+            query = query.where(User.username.ilike(f"%{search_query}%"))
+
+        # 排序 -> 跳过 -> 限制数量
+        query = query.order_by(User.id).offset(offset).limit(page_size)
+
+        result = await db.execute(query)
         return result.scalars().all()
 
 async def create_user(username, password):

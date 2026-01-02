@@ -49,6 +49,25 @@ def create_user_page():
                 ui.button('修改密码', icon='lock_reset', on_click=lambda: open_pwd_dialog()).props('flat color=orange')
                 ui.button('删除用户', icon='person_remove', on_click=lambda: delete_selected()).props('flat color=red')
 
+                ui.space()  # 把搜索框挤到右边
+
+                with ui.row().classes('items-center no-wrap gap-1'):
+                    # 搜索输入框
+                    search_input = ui.input(placeholder='请输入编号或名称') \
+                        .props('dense outlined clearable') \
+                        .classes('w-64') \
+                        .on('keydown.enter', lambda: load_users())  # 回车也能搜
+
+                    # 搜索按钮 (点击触发)
+                    search_btn = ui.button(icon='search', on_click=lambda: load_users()) \
+                        .props('flat round dense color=primary') \
+                        .tooltip('点击查询')
+
+                    # 等待提示 (加载圈)
+                    # 默认 visible=False (隐藏)，加载时显示
+                    loading_spinner = ui.spinner(size='2em').props('color=primary thickness=4')
+                    loading_spinner.visible = False
+
             # (2) AgGrid 表格配置
             # 注意：pagination=False，因为我们手动接管分页
             grid = ui.aggrid({
@@ -79,25 +98,30 @@ def create_user_page():
     # --- 4. 逻辑处理函数 ---
 
     async def load_users():
-        """加载数据核心逻辑"""
-        try:
-            # 1. 获取总记录数
-            total_count = await user_service.get_user_count()
+        # --- UI 交互：开始加载 ---
+        loading_spinner.visible = True  # 显示转圈
+        search_btn.disable()  # 禁用按钮防止狂点
+        search_input.disable()  # 禁用输入框
 
-            # 2. 计算总页数
-            # 如果 total_count 是 0，total_pages 至少应为 1
+        try:
+            # 获取搜索词
+            query = search_input.value
+
+            # 1. 获取带搜索条件的总是 (用于计算页数)
+            total_count = await user_service.get_user_count(query)
+
+            # 计算总页数 (防止 total_count=0 时报错)
             total_pages = math.ceil(total_count / page_state['page_size']) if total_count > 0 else 1
 
-            # 3. 页码越界修正 (比如删除了最后一页的数据)
+            # 搜索时，如果当前页码超过了新的总页数，重置为第1页
             if page_state['current_page'] > total_pages:
-                page_state['current_page'] = total_pages
-
-            print(f"加载第 {page_state['current_page']} 页，共 {total_pages} 页")
+                page_state['current_page'] = 1
 
             # 4. 获取分页数据
             users = await user_service.get_users_paginated(
                 page_state['current_page'],
-                page_state['page_size']
+                page_state['page_size'],
+            search_query = query
             )
 
             # 5. 格式化数据
@@ -109,26 +133,22 @@ def create_user_page():
             # 6. 更新表格
             await grid.run_grid_method('setGridOption', 'rowData', rows)
 
-
             # 7. 更新底部状态
-            pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页 (总数: {total_count})"
+            pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页"
 
-            # 控制按钮状态
-            if page_state['current_page'] <= 1:
-                btn_prev.disable()
+            # 只有在非搜索状态下才提示“更新成功”，避免刷屏
+            if not query:
+                ui.notify('列表已更新', type='positive', timeout=500)
             else:
-                btn_prev.enable()
-
-            if page_state['current_page'] >= total_pages:
-                btn_next.disable()
-            else:
-                btn_next.enable()
-
-            ui.notify('列表已更新', type='positive', timeout=1000)
+                ui.notify(f'查询完成，找到 {total_count} 条结果', type='info', timeout=1000)
 
         except Exception as e:
-            print(f"加载出错: {e}")
             ui.notify(f'加载失败: {e}', type='negative')
+        finally:
+            # --- UI 交互：结束加载 ---
+            loading_spinner.visible = False  # 隐藏转圈
+            search_btn.enable()  # 恢复按钮
+            search_input.enable()  # 恢复输入框
 
     # --- 功能函数 ---
 
