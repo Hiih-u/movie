@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, episode_management, register_page
+    crew_management, episode_management, register_page, user_home
 )
 
 # 定义 FastAPI
@@ -133,32 +133,7 @@ def admin_episodes():
 # --- 3. 前台首页路由 ---
 @ui.page('/')
 def index():
-    # 获取当前用户信息
-    username = app.storage.user.get('username', '访客')
-    is_login = app.storage.user.get('authenticated', False)
-    role = app.storage.user.get('role', 'user')
-
-    with ui.column().classes('w-full items-center q-pa-xl'):
-        ui.label('🎬 电影推荐系统前台').classes('text-h3 font-bold text-primary')
-        ui.label(f'欢迎回来，{username}').classes('text-h5 q-mt-md text-gray-600')
-
-        # 根据状态显示不同按钮
-        with ui.row().classes('q-mt-lg gap-4'):
-            if is_login:
-                # 只有管理员才显示“进入后台”
-                if role == 'admin':
-                    ui.button('进入后台管理', on_click=lambda: ui.navigate.to('/admin'), icon='settings').props(
-                        'unelevated color=deep-orange')
-                else:
-                    ui.button('我的片单', icon='favorite').props('outline color=pink')
-
-                # 退出按钮
-                ui.button('退出登录', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')),
-                          icon='logout').props('outline color=red')
-            else:
-                ui.button('登录 / 注册', on_click=lambda: ui.navigate.to('/login'), icon='login').props(
-                    'unelevated color=primary')
-
+    user_home.create_user_home()
 
 # --- 启动配置 ---
 # 注意：storage_secret 是 Session 加密必须的

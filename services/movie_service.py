@@ -107,3 +107,27 @@ async def get_movie_count(search_query=None):
 
         result = await db.execute(query)
         return result.scalar()
+
+
+async def get_homepage_movies(page: int, page_size: int, search_query=None):
+    """首页专用：联表查询 + 按热度排序"""
+    offset = (page - 1) * page_size
+    async with AsyncSessionLocal() as db:
+        query = (
+            select(TitleBasics, TitleRatings.averageRating)
+            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst, isouter=True)
+        )
+
+        if search_query:
+            query = query.where(or_(
+                TitleBasics.primaryTitle.ilike(f"%{search_query}%"),
+                TitleBasics.tconst.ilike(f"%{search_query}%")
+            ))
+            query = query.order_by(TitleBasics.tconst)
+        else:
+            # 首页默认按投票数倒序
+            query = query.order_by(desc(TitleRatings.numVotes).nulls_last())
+
+        query = query.offset(offset).limit(page_size)
+        result = await db.execute(query)
+        return result.all() # 返回元组列表
