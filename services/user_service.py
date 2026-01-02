@@ -35,8 +35,8 @@ async def get_users_paginated(page: int, page_size: int, search_query=None):
         result = await db.execute(query)
         return result.scalars().all()
 
-async def create_user(username, password):
-    """创建新用户"""
+async def create_user(username, password, role='user', gender=None, age=None, occupation=None):
+    """创建新用户 (支持角色和画像)"""
     async with AsyncSessionLocal() as db:
         # 1. 检查用户名是否已存在
         existing = await db.execute(select(User).where(User.username == username))
@@ -45,7 +45,14 @@ async def create_user(username, password):
 
         # 2. 加密密码并保存
         hashed = get_password_hash(password)
-        new_user = User(username=username, hashed_password=hashed)
+        new_user = User(
+            username=username,
+            hashed_password=hashed,
+            role=role,             # 【新增】角色
+            gender=gender,         # 【新增】性别
+            age=age,               # 【新增】年龄
+            occupation=occupation  # 【新增】职业
+        )
         db.add(new_user)
         try:
             await db.commit()

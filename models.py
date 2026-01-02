@@ -44,8 +44,15 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    hashed_password = Column(String)  # 存加密后的乱码
+    hashed_password = Column(String)
 
+    # 身份角色
+    role = Column(String, default="user")
+
+    # 【新增】推荐算法所需的用户画像字段
+    gender = Column(String, nullable=True)  # 性别: 'M', 'F'
+    age = Column(Integer, nullable=True)  # 年龄
+    occupation = Column(String, nullable=True)  # 职业
 
 # 3. 演职人员表 (name_basics)
 class NameBasics(Base):

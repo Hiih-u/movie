@@ -72,8 +72,12 @@ def create_user_page():
             # 注意：pagination=False，因为我们手动接管分页
             grid = ui.aggrid({
                 'columnDefs': [
-                    {'headerName': 'ID', 'field': 'id', 'checkboxSelection': True},  # 对应 Integer 类型
-                    {'headerName': '用户名', 'field': 'username'},  # 对应 String 类型
+                    {'headerName': 'ID', 'field': 'id', 'width': 70, 'checkboxSelection': True},
+                    {'headerName': '用户名', 'field': 'username'},
+                    {'headerName': '角色', 'field': 'role', 'width': 100},  # 新增
+                    {'headerName': '性别', 'field': 'gender', 'width': 80},  # 新增
+                    {'headerName': '年龄', 'field': 'age', 'width': 80},  # 新增
+                    {'headerName': '职业', 'field': 'occupation'},  # 新增
                 ],
                 'rowData': [],
                 'rowSelection': 'single',
@@ -125,11 +129,17 @@ def create_user_page():
             )
 
             # 5. 格式化数据
-            rows = [
-                {'id': u.id, 'username': str(u.username)}
-                for u in users
-            ]
-
+            rows = []
+            for u in users:
+                rows.append({
+                    'id': u.id,
+                    'username': str(u.username),
+                    # 读取 User 对象的新增属性，如果没有则显示空字符串或默认值
+                    'role': getattr(u, 'role', 'user'),
+                    'gender': getattr(u, 'gender', ''),
+                    'age': getattr(u, 'age', ''),
+                    'occupation': getattr(u, 'occupation', '')
+                })
             # 6. 更新表格
             await grid.run_grid_method('setGridOption', 'rowData', rows)
 
@@ -153,18 +163,37 @@ def create_user_page():
     # --- 功能函数 ---
 
     def open_add_dialog():
-        """打开新增窗口"""
+        """打开新增窗口 (支持全字段)"""
         with ui.dialog() as dialog, ui.card().classes('w-96'):
-            ui.label('新增管理员').classes('text-h6 font-bold')
+            ui.label('新增用户').classes('text-h6 font-bold')
+
+            # 必填项
             username = ui.input('用户名').classes('w-full')
             password = ui.input('密码', password=True, password_toggle_button=True).classes('w-full')
 
+            # 【新增】选填项 / 角色选择
+            role_select = ui.select(['user', 'admin'], value='user', label='角色').classes('w-full')
+
+            with ui.row().classes('w-full gap-2'):
+                gender_select = ui.select(['M', 'F'], label='性别').classes('w-1/3')
+                age_input = ui.number('年龄', format='%.0f').classes('w-1/3')
+                occ_input = ui.input('职业').classes('col')
+
             async def save():
                 if not username.value or not password.value:
-                    ui.notify('请填写完整', type='warning')
+                    ui.notify('用户名和密码必填', type='warning')
                     return
-                # 调用后端
-                success, msg = await user_service.create_user(username.value, password.value)
+
+                # 调用后端 (传入所有新参数)
+                success, msg = await user_service.create_user(
+                    username=username.value,
+                    password=password.value,
+                    role=role_select.value,
+                    gender=gender_select.value,
+                    age=int(age_input.value) if age_input.value else None,
+                    occupation=occ_input.value
+                )
+
                 if success:
                     ui.notify(msg, type='positive')
                     dialog.close()
