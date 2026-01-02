@@ -1,28 +1,55 @@
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, or_
 from database import AsyncSessionLocal
 from models import TitleEpisode, TitleBasics
 
-async def get_episode_count():
-    """获取剧集总条数"""
+
+async def get_episode_count(search_query=None):
+    """获取剧集总条数 (支持搜索)"""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(func.count(TitleEpisode.tconst)))
+        query = select(func.count(TitleEpisode.tconst))
+
+        # 如果有搜索内容，需要添加过滤条件
+        if search_query:
+            # 必须联表才能搜到 parentTitle (使用左外连接防止数据丢失)
+            query = query.join(TitleBasics, TitleEpisode.parentTconst == TitleBasics.tconst, isouter=True)
+            query = query.where(
+                or_(
+                    TitleEpisode.tconst.ilike(f"%{search_query}%"),  # 搜本集编号
+                    TitleEpisode.parentTconst.ilike(f"%{search_query}%"),  # 搜父级编号
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%")  # 搜父级剧集名
+                )
+            )
+
+        result = await db.execute(query)
         return result.scalar()
 
-async def get_episodes_paginated(page: int, page_size: int):
+
+async def get_episodes_paginated(page: int, page_size: int, search_query=None):
     """
-    分页获取剧集列表
-    这里联表查询 TitleBasics，为了显示 parentTconst 对应的剧集名称
+    分页获取剧集列表 (支持搜索)
+    联表查询 TitleBasics 以便显示 parentTconst 对应的剧集名称
     """
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
-        # 查询 TitleEpisode 和 对应的父级剧集名称 (primaryTitle)
+        # 基础查询
         stmt = (
             select(TitleEpisode, TitleBasics.primaryTitle)
-            .join(TitleBasics, TitleEpisode.parentTconst == TitleBasics.tconst, isouter=True) # 使用外连接，防止找不到父级时报错
-            .order_by(TitleEpisode.tconst)
-            .offset(offset)
-            .limit(page_size)
+            .join(TitleBasics, TitleEpisode.parentTconst == TitleBasics.tconst, isouter=True)
         )
+
+        # 如果有搜索内容，添加过滤条件
+        if search_query:
+            stmt = stmt.where(
+                or_(
+                    TitleEpisode.tconst.ilike(f"%{search_query}%"),  # 搜本集编号
+                    TitleEpisode.parentTconst.ilike(f"%{search_query}%"),  # 搜父级编号
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%")  # 搜父级剧集名
+                )
+            )
+
+        # 排序与分页
+        stmt = stmt.order_by(TitleEpisode.tconst).offset(offset).limit(page_size)
+
         result = await db.execute(stmt)
         return result.all()
 
