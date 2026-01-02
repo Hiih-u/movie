@@ -1,4 +1,4 @@
-from sqlalchemy import select, func, desc, update, delete
+from sqlalchemy import select, func, desc, update, delete, or_
 from database import AsyncSessionLocal
 from models import TitleBasics, TitleRatings
 
@@ -70,16 +70,40 @@ async def delete_movie(tconst):
             await db.rollback()
             return False
 
-async def get_movies_paginated(page: int, page_size: int):
-    """获取分页的电影列表数据"""
+# 3. 修改分页查询函数，接收搜索关键词
+async def get_movies_paginated(page: int, page_size: int, search_query=None):
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
-        # 按 tconst 排序保证分页稳定
-        query = select(TitleBasics).order_by(TitleBasics.tconst).offset(offset).limit(page_size)
+        query = select(TitleBasics)
+
+        # 如果有搜索内容，添加过滤条件 (逻辑同上)
+        if search_query:
+            query = query.where(
+                or_(
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%"),
+                    TitleBasics.tconst.ilike(f"%{search_query}%")
+                )
+            )
+
+        # 保持原有排序和分页
+        query = query.order_by(TitleBasics.tconst).offset(offset).limit(page_size)
         result = await db.execute(query)
         return result.scalars().all()
 
-async def get_movie_count():
+
+# 2. 修改计数函数，接收搜索关键词
+async def get_movie_count(search_query=None):
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(func.count(TitleBasics.tconst)))
+        query = select(func.count(TitleBasics.tconst))
+
+        # 如果有搜索内容，添加过滤条件
+        if search_query:
+            query = query.where(
+                or_(
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%"),  # 模糊匹配标题 (忽略大小写)
+                    TitleBasics.tconst.ilike(f"%{search_query}%")  # 模糊匹配编号
+                )
+            )
+
+        result = await db.execute(query)
         return result.scalar()

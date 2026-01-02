@@ -42,6 +42,25 @@ def create_movie_page():
                 ui.button('编辑', icon='edit', on_click=lambda: edit_selected()).props('flat color=blue')
                 ui.button('下架', icon='delete', on_click=lambda: delete_selected()).props('flat color=red')
 
+                ui.space()  # 把搜索框挤到右边
+
+                with ui.row().classes('items-center no-wrap gap-1'):
+                    # 搜索输入框
+                    search_input = ui.input(placeholder='请输入编号或名称') \
+                        .props('dense outlined clearable') \
+                        .classes('w-64') \
+                        .on('keydown.enter', lambda: load_data())  # 回车也能搜
+
+                    # 搜索按钮 (点击触发)
+                    search_btn = ui.button(icon='search', on_click=lambda: load_data()) \
+                        .props('flat round dense color=primary') \
+                        .tooltip('点击查询')
+
+                    # 等待提示 (加载圈)
+                    # 默认 visible=False (隐藏)，加载时显示
+                    loading_spinner = ui.spinner(size='2em').props('color=primary thickness=4')
+                    loading_spinner.visible = False
+
             grid = ui.aggrid({
                 'columnDefs': [
                     {'headerName': '编号', 'field': 'tconst', 'checkboxSelection': True},
@@ -68,16 +87,30 @@ def create_movie_page():
         await load_data()
 
     async def load_data():
+        # --- UI 交互：开始加载 ---
+        loading_spinner.visible = True  # 显示转圈
+        search_btn.disable()  # 禁用按钮防止狂点
+        search_input.disable()  # 禁用输入框
+
         try:
-            # 获取总数用于显示页码 (这里暂时用 stats_summary 里的总数)
-            total_count = await movie_service.get_movie_count()
-            total_pages = math.ceil(total_count / page_state['page_size'])
+            # 获取搜索词
+            query = search_input.value
 
-            print(f"加载第 {page_state['current_page']} 页数据...")
+            # 1. 获取带搜索条件的总是 (用于计算页数)
+            total_count = await movie_service.get_movie_count(query)
 
+            # 计算总页数 (防止 total_count=0 时报错)
+            total_pages = math.ceil(total_count / page_state['page_size']) if total_count > 0 else 1
+
+            # 搜索时，如果当前页码超过了新的总页数，重置为第1页
+            if page_state['current_page'] > total_pages:
+                page_state['current_page'] = 1
+
+            # 2. 获取带搜索条件的数据
             raw_data = await movie_service.get_movies_paginated(
                 page_state['current_page'],
-                page_state['page_size']
+                page_state['page_size'],
+                search_query=query  # 传入搜索词
             )
 
             rows = []
@@ -92,11 +125,21 @@ def create_movie_page():
             grid.options['rowData'] = rows
             grid.update()
             grid.run_grid_method('setRowData', rows)
-
             pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页"
-            ui.notify('列表已更新', type='positive', timeout=500)
+
+            # 只有在非搜索状态下才提示“更新成功”，避免刷屏
+            if not query:
+                ui.notify('列表已更新', type='positive', timeout=500)
+            else:
+                ui.notify(f'查询完成，找到 {total_count} 条结果', type='info', timeout=1000)
+
         except Exception as e:
             ui.notify(f'加载失败: {e}', type='negative')
+        finally:
+            # --- UI 交互：结束加载 ---
+            loading_spinner.visible = False  # 隐藏转圈
+            search_btn.enable()  # 恢复按钮
+            search_input.enable()  # 恢复输入框
 
     # --- 5. CRUD 弹窗逻辑 (保留原有逻辑) ---
     async def open_add_dialog():
