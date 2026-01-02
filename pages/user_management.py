@@ -5,14 +5,15 @@ import math  # 用于计算总页数
 
 def create_user_page():
     # --- 1. 状态管理 ---
-    # 分页状态：默认第1页，每页10条
+    # 分页状态：默认第1页，每页20条
     page_state = {
         'current_page': 1,
-        'page_size': 10
+        'page_size': 20
     }
 
     # --- 2. 侧边栏 (保持原样) ---
-    with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900'):
+    with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900') \
+            .props('width=220 breakpoint=700') as drawer:
         ui.button('回首页', icon='home', on_click=lambda: ui.navigate.to('/')) \
             .classes('text-h6 font-bold text-primary w-full') \
             .props('flat align=left no-caps q-pa-md')

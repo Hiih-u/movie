@@ -5,7 +5,8 @@ from services import analysis_service
 
 def create_admin_page():
     # 1. 侧边栏 (需同步更新)
-    with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900'):
+    with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900') \
+            .props('width=220 breakpoint=700') as drawer:
         ui.button('回首页', icon='home', on_click=lambda: ui.navigate.to('/')) \
             .classes('text-h6 font-bold text-primary w-full') \
             .props('flat align=left no-caps q-pa-md')
