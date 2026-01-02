@@ -42,6 +42,25 @@ def create_crew_page():
                 ui.button('编辑', icon='edit', on_click=lambda: edit_selected()).props('flat color=blue')
                 ui.button('删除', icon='delete', on_click=lambda: delete_selected()).props('flat color=red')
 
+                ui.space()  # 把搜索框挤到右边
+
+                with ui.row().classes('items-center no-wrap gap-1'):
+                    # 搜索输入框
+                    search_input = ui.input(placeholder='请输入编号或名称') \
+                        .props('dense outlined clearable') \
+                        .classes('w-64') \
+                        .on('keydown.enter', lambda: load_data())  # 回车也能搜
+
+                    # 搜索按钮 (点击触发)
+                    search_btn = ui.button(icon='search', on_click=lambda: load_data()) \
+                        .props('flat round dense color=primary') \
+                        .tooltip('点击查询')
+
+                    # 等待提示 (加载圈)
+                    # 默认 visible=False (隐藏)，加载时显示
+                    loading_spinner = ui.spinner(size='2em').props('color=primary thickness=4')
+                    loading_spinner.visible = False
+
             # 表格定义
             grid = ui.aggrid({
                 'columnDefs': [
@@ -63,16 +82,33 @@ def create_crew_page():
 
     # --- 4. 逻辑处理 ---
     async def load_data():
+        # --- UI 交互：开始加载 ---
+        loading_spinner.visible = True  # 显示转圈
+        search_btn.disable()  # 禁用按钮防止狂点
+        search_input.disable()  # 禁用输入框
+
         try:
-            total = await crew_service.get_crew_count() or 0
-            total_pages = math.ceil(total / page_state['page_size']) if total > 0 else 1
-            if page_state['current_page'] > total_pages: page_state['current_page'] = total_pages
+            # 获取搜索词
+            query = search_input.value
 
-            # 获取数据
-            data_list = await crew_service.get_crew_paginated(page_state['current_page'], page_state['page_size'])
+            # 1. 获取带搜索条件的总是 (用于计算页数)
+            total_count = await crew_service.get_crew_count(query)
 
+            # 计算总页数 (防止 total_count=0 时报错)
+            total_pages = math.ceil(total_count / page_state['page_size']) if total_count > 0 else 1
+
+            # 搜索时，如果当前页码超过了新的总页数，重置为第1页
+            if page_state['current_page'] > total_pages:
+                page_state['current_page'] = 1
+
+            # 2. 获取带搜索条件的数据
+            raw_data  = await crew_service.get_crew_paginated(
+                page_state['current_page'],
+                page_state['page_size'],
+                search_query=query  # 传入搜索词
+            )
             rows = []
-            for crew_obj, movie_name in data_list:
+            for crew_obj, movie_name in raw_data:
                 rows.append({
                     'tconst': crew_obj.tconst,
                     'title': movie_name,
@@ -83,10 +119,21 @@ def create_crew_page():
 
             await grid.run_grid_method('setGridOption', 'rowData', rows)
 
-            pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页 (总数: {total})"
-            ui.notify('列表已更新', type='positive', timeout=500)
+            pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页"
+
+            # 只有在非搜索状态下才提示“更新成功”，避免刷屏
+            if not query:
+                ui.notify('列表已更新', type='positive', timeout=500)
+            else:
+                ui.notify(f'查询完成，找到 {total_count} 条结果', type='info', timeout=1000)
+
         except Exception as e:
             ui.notify(f'加载失败: {e}', type='negative')
+        finally:
+            # --- UI 交互：结束加载 ---
+            loading_spinner.visible = False  # 隐藏转圈
+            search_btn.enable()  # 恢复按钮
+            search_input.enable()  # 恢复输入框
 
     async def change_page(delta):
         page_state['current_page'] += delta

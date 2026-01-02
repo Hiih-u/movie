@@ -1,27 +1,56 @@
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, or_
 from database import AsyncSessionLocal
 from models import TitleCrew, TitleBasics
 
-async def get_crew_count():
+
+# 修改计数函数，接收搜索关键词
+async def get_crew_count(search_query=None):
     """获取剧组信息总条数"""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(func.count(TitleCrew.tconst)))
+        query = select(func.count(TitleCrew.tconst))
+
+        # 如果有搜索内容，需要添加过滤条件
+        if search_query:
+            # 注意：因为要搜“电影名”，所以必须 join TitleBasics 表
+            query = query.join(TitleBasics, TitleCrew.tconst == TitleBasics.tconst)
+            query = query.where(
+                or_(
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%"),  # 搜电影名
+                    TitleCrew.tconst.ilike(f"%{search_query}%")  # 搜编号
+                )
+            )
+
+        result = await db.execute(query)
         return result.scalar()
 
-async def get_crew_paginated(page: int, page_size: int):
+
+# 修改分页查询函数，接收搜索关键词
+async def get_crew_paginated(page: int, page_size: int, search_query=None):
     """
     分页获取剧组列表
     联表查询 TitleBasics 以便显示电影名称
     """
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
+        # 基础查询：查 TitleCrew 和 TitleBasics.primaryTitle
+        # 默认就要 join，因为我们要显示电影名
         stmt = (
             select(TitleCrew, TitleBasics.primaryTitle)
             .join(TitleBasics, TitleCrew.tconst == TitleBasics.tconst)
-            .order_by(TitleCrew.tconst)
-            .offset(offset)
-            .limit(page_size)
         )
+
+        # 如果有搜索内容，添加过滤条件
+        if search_query:
+            stmt = stmt.where(
+                or_(
+                    TitleBasics.primaryTitle.ilike(f"%{search_query}%"),  # 搜电影名
+                    TitleCrew.tconst.ilike(f"%{search_query}%")  # 搜编号
+                )
+            )
+
+        # 排序、分页
+        stmt = stmt.order_by(TitleCrew.tconst).offset(offset).limit(page_size)
+
         result = await db.execute(stmt)
         return result.all()
 
