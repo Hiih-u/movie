@@ -4,9 +4,8 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home, episode_management
+    crew_management, register_page, user_home, episode_management, user_favorites, user_ratings
 )
-from pages.user_center import index as user_center_index
 
 # 定义 FastAPI
 app_fastapi = FastAPI()
@@ -133,13 +132,28 @@ def admin_crew():
 def index():
     user_home.create_user_home()
 
-@ui.page('/user-center')
-def user_center_route():
-    # 权限检查也可以放在这里做一层
+# @ui.page('/user-center')
+# def user_center_route():
+#     # 权限检查也可以放在这里做一层
+#     if not app.storage.user.get('authenticated', False):
+#         ui.navigate.to('/login')
+#         return
+#     user_center_index.create_page()
+
+@ui.page('/user/favorites')
+def page_user_favorites():
+    # 权限检查
     if not app.storage.user.get('authenticated', False):
         ui.navigate.to('/login')
         return
-    user_center_index.create_page()
+    user_favorites.create_page()
+
+@ui.page('/user/ratings')
+def page_user_ratings():
+    if not app.storage.user.get('authenticated', False):
+        ui.navigate.to('/login')
+        return
+    user_ratings.create_page()
 
 
 # --- 启动配置 ---

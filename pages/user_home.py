@@ -236,8 +236,20 @@ def create_user_home():
                             # 模块：快捷入口
                             with ui.card().classes('w-full p-5 gap-3 shadow-sm bg-blue-50 border border-blue-100'):
                                 ui.label('🚀 快速通道').classes('font-bold text-slate-800')
-                                ui.link('进入个人中心', '/user-center').classes(
-                                    'text-sm text-blue-600 font-bold cursor-pointer hover:underline text-lg')
+
+                                # 2. 快捷入口：我的收藏 (带高亮交互)
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.icon('favorite', size='xs', color='red')
+                                    ui.link('我的收藏列表', '/user/favorites').classes(
+                                        'text-sm text-slate-700 font-medium cursor-pointer hover:text-rose-600 hover:underline')
+
+                                # 3. 快捷入口：我的评分
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.icon('star', size='xs', color='orange')
+                                    ui.link('我的评分管理', '/user/ratings').classes(
+                                        'text-sm text-slate-700 font-medium cursor-pointer hover:text-orange-600 hover:underline')
+
+
 
 
                 # --- D. 页脚 ---

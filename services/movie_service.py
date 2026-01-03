@@ -137,7 +137,7 @@ async def refresh_movie_summary():
                                r.numvotes        -- 改为小写
                         FROM title_basics b
                                  LEFT JOIN title_ratings r ON b.tconst = r.tconst
-                        WHERE b.titletype = 'movie'
+                        WHERE b.titletype IN ('movie', 'tvSeries', 'tvMiniSeries', 'tvMovie')
                         """)
             await db.execute(stmt)
             await db.commit()

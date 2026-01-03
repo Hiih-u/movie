@@ -17,11 +17,11 @@ async def get_top_movies(limit=10):
         return result.all()
 
 async def get_year_stats(limit=20):
-    """统计近 N 年的电影产量分布"""
+    """统计近 N 年的影视产量分布"""
     async with AsyncSessionLocal() as db:
         query = (
             select(TitleBasics.startYear, func.count(TitleBasics.tconst))
-            .where(TitleBasics.titleType == 'movie')
+            .where(TitleBasics.titleType.in_(['movie', 'tvSeries', 'tvMiniSeries', 'tvMovie']))
             .where(TitleBasics.startYear.is_not(None))
             .group_by(TitleBasics.startYear)
             .order_by(desc(TitleBasics.startYear))

@@ -17,7 +17,7 @@ def create_admin_page():
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
                 'w-full').props('flat')
-            ui.button('电影管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
+            ui.button('影视管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
                 'w-full').props('flat')
             ui.button('评分管理', icon='star', on_click=lambda: ui.navigate.to('/admin/ratings')).classes(
                 'w-full').props('flat')
@@ -30,14 +30,14 @@ def create_admin_page():
     with ui.column().classes('w-full q-pa-md items-center'):
         # 顶部标题栏
         with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
-            ui.label('📊 电影大数据分析终端').classes('text-h4 font-bold')
+            ui.label('📊 影视大数据分析终端').classes('text-h4 font-bold')
             ui.button('刷新数据', icon='refresh', on_click=lambda: load_stats()).props(
                 'unelevated rounded color=primary')
 
         # --- 统计指标卡片 ---
         with ui.row().classes('w-full q-mb-md'):
             with ui.card().classes('col q-pa-sm items-center border'):
-                ui.label('总电影条目').classes('text-grey-7 text-xs')
+                ui.label('总影视条目').classes('text-grey-7 text-xs')
                 total_label = ui.label('Loading...').classes('text-h5 font-bold')
             with ui.card().classes('col q-pa-sm items-center border'):
                 ui.label('全网平均分').classes('text-grey-7 text-xs')
@@ -72,7 +72,7 @@ def create_admin_page():
                 year_stats = await analysis_service.get_year_stats()
                 chart_container_2.clear()
                 with chart_container_2:
-                    ui.label('📈 电影产量年度趋势').classes('font-bold q-pa-sm')
+                    ui.label('📈 影视产量年度趋势').classes('font-bold q-pa-sm')
                     if year_stats:
                         sorted_stats = sorted(year_stats, key=lambda x: x[0])
                         fig2 = go.Figure(data=[
