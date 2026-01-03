@@ -78,3 +78,34 @@ async def get_user_ratings_map(user_id: int):
         stmt = select(UserRating).where(UserRating.user_id == user_id)
         result = await db.execute(stmt)
         return {r.tconst: r.rating for r in result.scalars().all()}
+
+
+async def get_my_ratings_paginated(user_id: int, page: int = 1, page_size: int = 20):
+    """分页获取我的个人评分记录，并关联电影基本信息"""
+    offset = (page - 1) * page_size
+    async with AsyncSessionLocal() as db:
+        # 联表查询 UserRating 和 MovieSummary (或 TitleBasics)
+        stmt = (
+            select(UserRating, MovieSummary.primaryTitle)
+            .join(MovieSummary, UserRating.tconst == MovieSummary.tconst)
+            .where(UserRating.user_id == user_id)
+            .order_by(desc(UserRating.created_at))
+            .offset(offset)
+            .limit(page_size)
+        )
+        result = await db.execute(stmt)
+        return result.all() # 返回 (UserRating对象, 电影名) 的列表
+
+async def delete_user_rating(user_id: int, tconst: str):
+    """物理删除某条评分记录"""
+    async with AsyncSessionLocal() as db:
+        try:
+            stmt = delete(UserRating).where(
+                and_(UserRating.user_id == user_id, UserRating.tconst == tconst)
+            )
+            await db.execute(stmt)
+            await db.commit()
+            return True, "删除成功"
+        except Exception as e:
+            await db.rollback()
+            return False, str(e)

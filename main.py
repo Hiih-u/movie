@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home, episode_management, favorite_page
+    crew_management, register_page, user_home, episode_management, favorite_page, my_ratings_page
 )
 
 # 定义 FastAPI
@@ -139,6 +139,10 @@ def favorites():
         ui.navigate.to('/login')
         return
     favorite_page.create_favorite_page()
+
+@ui.page('/my-ratings')
+def my_ratings():
+    my_ratings_page.create_my_ratings_page()
 
 # --- 启动配置 ---
 # 注意：storage_secret 是 Session 加密必须的
