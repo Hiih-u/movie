@@ -2,6 +2,14 @@ from nicegui import ui, app
 from services import user_service
 import math  # 用于计算总页数
 
+OCCUPATIONS = [
+    "Student (学生)", "Engineer (工程师)", "Programmer (程序员)",
+    "Educator (教育工作者)", "Scientist (科学家)", "Artist (艺术家)",
+    "Administrator (行政/管理)", "Technician (技术人员)", "Writer (作家)",
+    "Healthcare (医疗/护理)", "Entertainment (娱乐/演艺)", "Executive (高管)",
+    "Lawyer (律师)", "Marketing (市场/营销)", "Sales (销售)",
+    "Retired (退休)", "Unemployed (待业)", "Other (其他)"
+]
 
 def create_user_page():
     # --- 1. 状态管理 ---
@@ -47,6 +55,7 @@ def create_user_page():
             with ui.row().classes('q-pa-sm gap-2'):
                 ui.button('新增管理员', icon='person_add', on_click=lambda: open_add_dialog()).props(
                     'unelevated color=green')
+                ui.button('编辑信息', icon='edit', on_click=lambda: open_edit_dialog()).props('flat color=blue')
                 ui.button('修改密码', icon='lock_reset', on_click=lambda: open_pwd_dialog()).props('flat color=orange')
                 ui.button('删除用户', icon='person_remove', on_click=lambda: delete_selected()).props('flat color=red')
 
@@ -178,7 +187,13 @@ def create_user_page():
             with ui.row().classes('w-full gap-2'):
                 gender_select = ui.select(['M', 'F'], label='性别').classes('w-1/3')
                 age_input = ui.number('年龄', format='%.0f').classes('w-1/3')
-                occ_input = ui.input('职业').classes('col')
+                # --- 修改点：职业选择框 ---
+                occ_input = ui.select(
+                    options=OCCUPATIONS,
+                    label='职业 (请选择)',
+                    with_input=True
+                ).classes('col').props('use-input input-debounce="0" behavior="menu"')
+                # -----------------------
 
             async def save():
                 if not username.value or not password.value:
@@ -205,6 +220,78 @@ def create_user_page():
             with ui.row().classes('w-full justify-end q-mt-md'):
                 ui.button('取消', on_click=dialog.close).props('flat')
                 ui.button('创建', on_click=save).props('unelevated color=green')
+        dialog.open()
+
+    async def open_edit_dialog():
+        rows = await grid.get_selected_rows()
+        if not rows:
+            ui.notify('请先选择一个用户', type='warning')
+            return
+
+        user_data = rows[0]
+
+        with ui.dialog() as dialog, ui.card().classes('w-96'):
+            ui.label(f'编辑用户: {user_data["username"]}').classes('text-h6 font-bold')
+
+            # 角色选择 (回显数据)
+            role_select = ui.select(
+                ['user', 'admin'],
+                value=user_data.get('role', 'user'),
+                label='角色'
+            ).classes('w-full')
+
+            with ui.row().classes('w-full gap-2'):
+                # 性别
+                gender_select = ui.select(
+                    ['M', 'F'],
+                    value=user_data.get('gender'),
+                    label='性别'
+                ).classes('w-1/3')
+
+                # 年龄 (处理空值)
+                current_age = user_data.get('age')
+                if current_age == '': current_age = None
+                age_input = ui.number('年龄', value=current_age, format='%.0f').classes('w-1/3')
+
+                # --- 【修复点】职业数据的安全性校验 ---
+                # 获取当前用户的职业数据
+                current_occ = user_data.get('occupation')
+
+                # 关键步骤：如果当前职业不在预定义的 OCCUPATIONS 列表中（比如是空字符串），
+                # 强制将其设为 None，否则 ui.select 会抛出 "Invalid value" 错误并崩溃。
+                if current_occ not in OCCUPATIONS:
+                    current_occ = None
+
+                occ_input = ui.select(
+                    options=OCCUPATIONS,
+                    label='职业 (请选择)',
+                    value=current_occ,  # 使用清洗后的值
+                    with_input=True
+                ).classes('col').props('use-input input-debounce="0" behavior="menu"')
+
+
+            async def save():
+                # 调用后端更新服务
+                success, msg = await user_service.update_user(
+                    user_id=user_data['id'],
+                    role=role_select.value,
+                    gender=gender_select.value,
+                    age=int(age_input.value) if age_input.value else None,
+                    occupation=occ_input.value
+                )
+
+                if success:
+                    ui.notify(msg, type='positive')
+                    dialog.close()
+                    await load_users()  # 刷新表格
+                else:
+                    ui.notify(msg, type='negative')
+
+            # 底部按钮
+            with ui.row().classes('w-full justify-end q-mt-md'):
+                ui.button('取消', on_click=dialog.close).props('flat')
+                ui.button('保存修改', on_click=save).props('unelevated color=primary')
+
         dialog.open()
 
     async def delete_selected():

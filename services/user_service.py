@@ -87,3 +87,27 @@ async def change_password(user_id, new_password):
         except Exception as e:
             await db.rollback()
             return False, str(e)
+
+async def update_user(user_id, role, gender, age, occupation):
+    """
+    【新增】更新用户的基础信息（不含密码）
+    """
+    async with AsyncSessionLocal() as db:
+        try:
+            # 构建更新语句
+            stmt = (
+                update(User)
+                .where(User.id == user_id)
+                .values(
+                    role=role,
+                    gender=gender,
+                    age=age,
+                    occupation=occupation
+                )
+            )
+            await db.execute(stmt)
+            await db.commit()
+            return True, "用户信息更新成功"
+        except Exception as e:
+            await db.rollback()
+            return False, f"更新失败: {str(e)}"
