@@ -1,5 +1,6 @@
 from nicegui import ui, app
-from services import movie_service, analysis_service
+# 【修改 1】导入 interaction_service 服务
+from services import movie_service, analysis_service, interaction_service
 import random
 
 BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
@@ -10,6 +11,8 @@ def create_user_home():
     username = app.storage.user.get('username', '访客')
     is_login = app.storage.user.get('authenticated', False)
     user_role = app.storage.user.get('role', 'user')
+    # 【修改 2】获取 user_id (用于数据库操作)
+    user_id = app.storage.user.get('user_id', None)
 
     # --- 导航栏 ---
     with ui.header().classes('bg-white text-slate-900 shadow-sm border-b items-center h-16 px-6'):
@@ -19,7 +22,6 @@ def create_user_home():
             ui.label('MovieRec Sys').classes('text-xl font-bold text-primary tracking-tight')
 
         # 2. 搜索区域
-        # ✅ 修改点：添加 'ml-12' (margin-left) 让搜索框和 Logo 保持一点距离
         with ui.row().classes('items-center gap-0 ml-12'):
             search_input = ui.input(placeholder='搜索电影...').props('rounded-l outlined dense').classes('w-60 md:w-80')
             search_input.on('keydown.enter', lambda: load_movies(query=search_input.value))
@@ -51,8 +53,61 @@ def create_user_home():
     # --- 主容器 ---
     content_div = ui.column().classes('w-full min-h-screen bg-slate-50 items-center')
 
+    # --- 【修改 3】交互逻辑函数 (收藏与评分) ---
+
+    async def toggle_fav(e, tconst):
+        """点击收藏/取消收藏"""
+        if not is_login:
+            ui.notify('请先登录', type='warning')
+            return
+
+        # 调用后端切换状态
+        is_added, msg = await interaction_service.toggle_favorite(user_id, tconst)
+        ui.notify(msg, type='positive' if is_added else 'info')
+
+        # 刷新当前图标状态
+        btn = e.sender
+        if is_added:
+            btn.props('icon=favorite color=red')
+        else:
+            btn.props('icon=favorite_border color=white')
+
+    def open_rate_dialog(tconst, title, current_score=0):
+        """打开评分弹窗"""
+        if not is_login:
+            ui.notify('请先登录', type='warning')
+            return
+
+        with ui.dialog() as dialog, ui.card().classes('w-96'):
+            ui.label(f'给 "{title}" 打分').classes('text-lg font-bold')
+            ui.label('拖动滑块进行评价 (1-10分)').classes('text-xs text-slate-400')
+
+            # 滑块组件 (默认值设为8.0或当前评分)
+            slider = ui.slider(min=1, max=10, step=0.5, value=current_score or 8.0).props('label-always color=orange')
+
+            async def save():
+                await interaction_service.set_user_rating(user_id, tconst, slider.value)
+                ui.notify('评分成功！', type='positive')
+                dialog.close()
+                # 刷新列表以更新显示的“我的评分”
+                await load_movies(search_input.value)
+
+            with ui.row().classes('w-full justify-end q-mt-md'):
+                ui.button('取消', on_click=dialog.close).props('flat')
+                ui.button('提交', on_click=save).props('unelevated color=orange')
+        dialog.open()
+
+    # --- 加载数据主逻辑 ---
+
     async def load_movies(query=None):
         content_div.clear()
+
+        # 【修改 4】预先获取当前用户的收藏列表和评分字典
+        my_favs = set()
+        my_ratings = {}
+        if is_login and user_id:
+            my_favs = await interaction_service.get_user_favorites(user_id)
+            my_ratings = await interaction_service.get_user_ratings_map(user_id)
 
         with content_div:
             with ui.column().classes('w-full max-w-[1400px] p-6 gap-8'):
@@ -86,23 +141,34 @@ def create_user_home():
                         else:
                             # Grid 3 列
                             with ui.grid(columns=3).classes('w-full gap-6'):
-                                # 【关键修改】这里要解包 (m, rating)
                                 for index, m in enumerate(movies):
                                     bg = BG_COLORS[index % len(BG_COLORS)]
 
                                     display_rating = str(m.averageRating) if m.averageRating else 'N/A'
                                     display_runtime = f"{m.runtimeMinutes}" if m.runtimeMinutes else "?"
 
+                                    # 卡片容器 (增加 relative 以便定位收藏按钮)
                                     with ui.card().classes(
-                                            'w-full h-[300px] p-0 gap-0 shadow hover:shadow-lg transition-all group'):
+                                            'w-full h-[320px] p-0 gap-0 shadow hover:shadow-lg transition-all group relative'):
 
-                                        # 封面区 (不变)
+                                        # 【修改 5】右上角收藏按钮 (绝对定位)
+                                        if is_login:
+                                            is_fav = m.tconst in my_favs
+                                            fav_icon = 'favorite' if is_fav else 'favorite_border'
+                                            fav_color = 'red' if is_fav else 'white'
+
+                                            ui.button(icon=fav_icon,
+                                                      on_click=lambda e, mid=m.tconst: toggle_fav(e, mid)) \
+                                                .props(f'flat round color={fav_color} dense') \
+                                                .classes('absolute top-2 right-2 z-20 bg-black/20 backdrop-blur-sm')
+
+                                        # 封面区
                                         with ui.column().classes(
                                                 f'w-full h-[55%] {bg} items-center justify-center relative overflow-hidden'):
                                             ui.label(m.primaryTitle[:1]).classes(
                                                 'text-8xl text-white opacity-30 font-black group-hover:scale-110 transition-transform')
                                             ui.label(str(m.startYear)).classes(
-                                                'absolute top-2 right-2 bg-black/40 text-white text-xs px-2 rounded-full')
+                                                'absolute bottom-2 left-2 bg-black/40 text-white text-xs px-2 rounded-full')
 
                                         # 内容区
                                         with ui.column().classes('w-full h-[45%] p-3 justify-between bg-white'):
@@ -114,13 +180,31 @@ def create_user_home():
                                                     ui.label(g).classes(
                                                         'text-[10px] text-slate-500 bg-slate-100 px-1.5 rounded')
 
-                                            # 【关键修改】显示真实数据
+                                            ui.separator().classes('my-1')
+
+                                            # 【修改 6】底部信息栏：左侧 IMDb 分，右侧“我的评分”
                                             with ui.row().classes(
-                                                    'w-full justify-between border-t pt-2 mt-auto items-center'):
-                                                # 真实评分
-                                                ui.label(f'★ {display_rating}').classes('text-xs font-bold text-orange-500')
-                                                # 真实时长
-                                                ui.label(f'{display_runtime} min').classes('text-xs text-slate-400')
+                                                    'w-full justify-between items-center'):
+                                                # IMDb 评分
+                                                ui.label(f'IMDb: {display_rating}').classes(
+                                                    'text-xs font-bold text-slate-500')
+
+                                                # 用户评分按钮
+                                                if is_login:
+                                                    my_score = my_ratings.get(m.tconst)
+                                                    # 如果评过分，显示分数；没评过，显示“打分”
+                                                    btn_text = str(my_score) if my_score else '打分'
+                                                    btn_color = 'orange' if my_score else 'grey-5'
+                                                    btn_icon = 'star' if my_score else 'star_outline'
+
+                                                    ui.button(btn_text, icon=btn_icon,
+                                                              on_click=lambda mid=m.tconst, t=m.primaryTitle,
+                                                                              s=my_score: open_rate_dialog(mid, t, s)) \
+                                                        .props(f'flat dense size=sm color={btn_color}') \
+                                                        .tooltip('点击进行个人评分')
+                                                else:
+                                                    # 未登录只显示时长
+                                                    ui.label(f'{display_runtime} min').classes('text-xs text-slate-400')
 
                     # === 右侧：侧边栏 ===
                     if is_login and not query:
