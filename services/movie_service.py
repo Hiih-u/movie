@@ -77,7 +77,7 @@ async def get_movies_paginated(page: int, page_size: int, search_query=None):
     async with AsyncSessionLocal() as db:
         query = select(TitleBasics)
 
-        # 如果有搜索内容，添加过滤条件 (逻辑同上)
+        # 如果有搜索内容，添加过滤条件
         if search_query:
             query = query.where(
                 or_(
