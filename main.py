@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home, episode_management, favorite_page, my_ratings_page
+    crew_management, register_page, user_home, episode_management, favorite_page, my_ratings_page, user_center
 )
 
 # 定义 FastAPI
@@ -131,6 +131,14 @@ def admin_crew():
 @ui.page('/')
 def index():
     user_home.create_user_home()
+
+@ui.page('/user-center')
+def user_center_page():
+    # 也可以在这里做一次简单的登录检查，虽然 create_user_center_page 里也有
+    if not app.storage.user.get('authenticated', False):
+        ui.navigate.to('/login')
+        return
+    user_center.create_user_center_page()
 
 # 【新增】收藏页路由 (需登录)
 @ui.page('/favorites')

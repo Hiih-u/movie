@@ -236,7 +236,8 @@ def create_user_home():
                             # 模块：快捷入口
                             with ui.card().classes('w-full p-5 gap-3 shadow-sm bg-blue-50 border border-blue-100'):
                                 ui.label('🚀 快速通道').classes('font-bold text-slate-800')
-
+                                ui.link('进入个人中心', '/user-center').classes(
+                                    'text-sm text-blue-600 font-bold cursor-pointer hover:underline text-lg')
                                 # 【修改】将 Label 改为 Link 或 Button，并绑定跳转
                                 ui.link('我的收藏列表', '/favorites').classes(
                                     'text-sm text-blue-600 font-bold cursor-pointer hover:underline')
