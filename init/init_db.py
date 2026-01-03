@@ -1,8 +1,7 @@
 # init_db.py
 import asyncio
 from database import engine, Base
-# 必须导入 models，这样 Base 才能知道有哪些表需要创建
-from models import TitleBasics, TitleRatings, User
+from models import TitleBasics, TitleRatings, User, UserFavorite, UserRating, MovieSummary, TitleCrew, NameBasics
 
 
 async def init_models():

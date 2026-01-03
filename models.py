@@ -1,4 +1,6 @@
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey
+from datetime import datetime
+
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -95,3 +97,22 @@ class MovieSummary(Base):
     # 把评分表的数据也搬过来
     averageRating = Column(Float)
     numVotes = Column(Integer, index=True)  # 加索引，排序飞快
+
+# 6. 用户收藏表
+class UserFavorite(Base):
+    __tablename__ = "user_favorites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    tconst = Column(String, ForeignKey("title_basics.tconst"), index=True)
+    created_at = Column(DateTime, default=datetime.now)
+
+# 7. 用户个人评分表
+class UserRating(Base):
+    __tablename__ = "user_personal_ratings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    tconst = Column(String, ForeignKey("title_basics.tconst"), index=True)
+    rating = Column(Float)  # 用户打分 (e.g. 1.0 - 10.0)
+    created_at = Column(DateTime, default=datetime.now)
