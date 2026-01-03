@@ -1,7 +1,7 @@
 # init_db.py
 import asyncio
 from database import engine, Base
-from models import TitleBasics, TitleRatings, User, UserFavorite, UserRating, MovieSummary, TitleCrew, NameBasics
+from models import TitleBasics, TitleRatings, User, UserFavorite, UserRating, MovieSummary, TitleCrew, NameBasics, TitleEpisode
 
 
 async def init_models():

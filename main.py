@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home
+    crew_management, register_page, user_home, episode_management
 )
 
 # 定义 FastAPI
@@ -111,6 +111,13 @@ def admin_ratings():
     if not check_admin_access(): return
     admin_header()
     rating_management.create_rating_page()
+
+
+@ui.page('/admin/episodes')
+def admin_episodes():
+    if not check_admin_access(): return
+    admin_header()
+    episode_management.create_episode_page()
 
 
 @ui.page('/admin/crew')

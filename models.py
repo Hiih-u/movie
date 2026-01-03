@@ -84,6 +84,21 @@ class TitleCrew(Base):
     movie = relationship("TitleBasics", back_populates="crew")
 
 
+# 【新增】4. 剧集信息表 (title_episode)
+class TitleEpisode(Base):
+    __tablename__ = "title_episode"
+
+    # 根据你提供的表结构
+    tconst = Column("tconst", String, primary_key=True)  # 这一集本身的编号
+    parentTconst = Column("parenttconst", String, index=True) # 父级(剧集)编号
+    seasonNumber = Column("seasonnumber", Integer)
+    episodeNumber = Column("episodenumber", Integer)
+
+    # 建立关联，方便查询时获取 剧集(Series) 的名称
+    # 注意：这里假设 parentTconst 关联到 TitleBasics 的 tconst
+    parent_series = relationship("TitleBasics", foreign_keys=[parentTconst], primaryjoin="TitleEpisode.parentTconst==TitleBasics.tconst", uselist=False)
+
+
 # 【新增】首页高性能缓存表 (把电影信息和评分合二为一)
 class MovieSummary(Base):
     __tablename__ = "movie_summary"
@@ -116,3 +131,4 @@ class UserRating(Base):
     tconst = Column(String, ForeignKey("title_basics.tconst"), index=True)
     rating = Column(Float)  # 用户打分 (e.g. 1.0 - 10.0)
     created_at = Column(DateTime, default=datetime.now)
+

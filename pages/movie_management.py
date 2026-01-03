@@ -26,6 +26,8 @@ def create_movie_page():
                 'w-full').props('flat')
             ui.button('剧组管理', icon='star', on_click=lambda: ui.navigate.to('/admin/crew')).classes(
                 'w-full').props('flat')
+            ui.button('剧集管理', icon='subscriptions', on_click=lambda: ui.navigate.to('/admin/episodes')).classes(
+                'w-full').props('flat')
 
 
     # --- 3. 主内容区 ---

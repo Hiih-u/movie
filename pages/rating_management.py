@@ -27,6 +27,8 @@ def create_rating_page():
             ui.button('评分管理', icon='star').classes('w-full shadow-sm bg-white text-primary').props('flat')
             ui.button('剧组管理', icon='star', on_click=lambda: ui.navigate.to('/admin/crew')).classes(
                 'w-full').props('flat')
+            ui.button('剧集管理', icon='subscriptions', on_click=lambda: ui.navigate.to('/admin/episodes')).classes(
+                'w-full').props('flat')
 
 
     # --- 3. 主内容区 ---

@@ -26,6 +26,8 @@ def create_crew_page():
             ui.button('评分管理', icon='star', on_click=lambda: ui.navigate.to('/admin/ratings')).classes(
                 'w-full').props('flat')
             ui.button('剧组管理', icon='groups').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            ui.button('剧集管理', icon='subscriptions', on_click=lambda: ui.navigate.to('/admin/episodes')).classes(
+                'w-full').props('flat')
 
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
