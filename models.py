@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -119,8 +119,13 @@ class UserFavorite(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
-    tconst = Column(String, ForeignKey("title_basics.tconst"), index=True)
+    tconst = Column(String, ForeignKey("movie_summary.tconst"), index=True)
     created_at = Column(DateTime, default=datetime.now)
+
+    # 【优化】添加联合唯一约束，物理层面防止重复收藏，且自动创建联合索引加速查询
+    __table_args__ = (
+        UniqueConstraint('user_id', 'tconst', name='uix_user_favorite'),
+    )
 
 # 7. 用户个人评分表
 class UserRating(Base):

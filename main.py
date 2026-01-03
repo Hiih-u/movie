@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home, episode_management
+    crew_management, register_page, user_home, episode_management, favorite_page
 )
 
 # 定义 FastAPI
@@ -131,6 +131,14 @@ def admin_crew():
 @ui.page('/')
 def index():
     user_home.create_user_home()
+
+# 【新增】收藏页路由 (需登录)
+@ui.page('/favorites')
+def favorites():
+    if not app.storage.user.get('authenticated', False):
+        ui.navigate.to('/login')
+        return
+    favorite_page.create_favorite_page()
 
 # --- 启动配置 ---
 # 注意：storage_secret 是 Session 加密必须的

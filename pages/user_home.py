@@ -106,7 +106,7 @@ def create_user_home():
         my_favs = set()
         my_ratings = {}
         if is_login and user_id:
-            my_favs = await interaction_service.get_user_favorites(user_id)
+            my_favs = await interaction_service.get_user_favorite_ids(user_id)
             my_ratings = await interaction_service.get_user_ratings_map(user_id)
 
         with content_div:
@@ -236,8 +236,11 @@ def create_user_home():
                             # 模块：快捷入口
                             with ui.card().classes('w-full p-5 gap-3 shadow-sm bg-blue-50 border border-blue-100'):
                                 ui.label('🚀 快速通道').classes('font-bold text-slate-800')
-                                ui.label('我的收藏').classes('text-sm text-slate-600')
-                                ui.label('浏览历史').classes('text-sm text-slate-600')
+
+                                # 【修改】将 Label 改为 Link 或 Button，并绑定跳转
+                                ui.link('我的收藏列表', '/favorites').classes(
+                                    'text-sm text-blue-600 font-bold cursor-pointer hover:underline')
+
                                 ui.label('个人画像设置').classes('text-sm text-slate-600')
 
                 # --- D. 页脚 ---
