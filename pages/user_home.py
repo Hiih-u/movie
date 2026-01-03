@@ -238,12 +238,7 @@ def create_user_home():
                                 ui.label('🚀 快速通道').classes('font-bold text-slate-800')
                                 ui.link('进入个人中心', '/user-center').classes(
                                     'text-sm text-blue-600 font-bold cursor-pointer hover:underline text-lg')
-                                # 【修改】将 Label 改为 Link 或 Button，并绑定跳转
-                                ui.link('我的收藏列表', '/favorites').classes(
-                                    'text-sm text-blue-600 font-bold cursor-pointer hover:underline')
-                                ui.link('我的评分管理', '/my-ratings').classes(
-                                    'text-sm text-orange-600 font-bold cursor-pointer hover:underline')
-                                ui.label('个人画像设置').classes('text-sm text-slate-600')
+
 
                 # --- D. 页脚 ---
                 ui.separator().classes('mt-10')
