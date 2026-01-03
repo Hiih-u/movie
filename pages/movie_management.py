@@ -1,13 +1,24 @@
+# pages/movie_management.py
 from nicegui import ui, app
 from services import movie_service
 import math
 
+# 定义支持的影视类型 (IMDb 标准)
+TITLE_TYPES = {
+    'movie': '电影 (Movie)',
+    'tvSeries': '连续剧 (TV Series)',
+    'tvMiniSeries': '迷你剧 (Mini Series)',
+    'tvMovie': '电视电影 (TV Movie)',
+    'short': '短片 (Short)',
+    'video': '视频 (Video)'
+}
+
 
 def create_movie_page():
     # --- 1. 状态管理 ---
-    page_state = {'current_page': 1, 'page_size': 20}  # 改成每页20条，体验更好
+    page_state = {'current_page': 1, 'page_size': 20}
 
-    # --- 2. 侧边栏 (导航菜单) ---
+    # --- 2. 侧边栏 (保持不变) ---
     with ui.left_drawer(value=True).classes('bg-blue-grey-1 text-slate-900') \
             .props('width=220 breakpoint=700') as drawer:
         ui.button('回首页', icon='home', on_click=lambda: ui.navigate.to('/')) \
@@ -21,22 +32,22 @@ def create_movie_page():
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
                 'w-full').props('flat')
-            ui.button('电影管理', icon='movie').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            # 高亮当前页
+            ui.button('影视管理', icon='movie').classes('w-full shadow-sm bg-white text-primary').props('flat')
             ui.button('评分管理', icon='star', on_click=lambda: ui.navigate.to('/admin/ratings')).classes(
                 'w-full').props('flat')
-            ui.button('剧组管理', icon='star', on_click=lambda: ui.navigate.to('/admin/crew')).classes(
+            ui.button('剧组管理', icon='groups', on_click=lambda: ui.navigate.to('/admin/crew')).classes(
                 'w-full').props('flat')
             ui.button('剧集管理', icon='subscriptions', on_click=lambda: ui.navigate.to('/admin/episodes')).classes(
                 'w-full').props('flat')
 
-
     # --- 3. 主内容区 ---
     with ui.column().classes('w-full q-pa-md items-center'):
-        # 3.1 标题栏 刷新列表按钮下移
+        # 3.1 标题栏
         with ui.row().classes('w-full justify-between items-center q-mb-lg q-mt-md'):
-            ui.label('🎬 电影资源管理').classes('text-h4 font-bold')
+            ui.label('🎬 影视内容库管理').classes('text-h4 font-bold')
             with ui.row().classes('gap-2'):
-                # 【新增】重建缓存按钮
+                # 重建缓存按钮
                 async def do_refresh():
                     ui.notify('正在后台重建索引，请稍候...', type='info')
                     success, msg = await movie_service.refresh_movie_summary()
@@ -47,7 +58,7 @@ def create_movie_page():
 
                 ui.button('重建缓存', icon='cloud_sync', on_click=do_refresh) \
                     .props('outline rounded color=deep-orange') \
-                    .tooltip('点击将重新生成首页的热度排序数据')
+                    .tooltip('修改数据后，点击此按钮同步到首页')
 
                 ui.button('刷新列表', icon='refresh', on_click=lambda: load_data()) \
                     .props('unelevated rounded color=primary shadow-sm')
@@ -56,34 +67,33 @@ def create_movie_page():
         with ui.card().classes('w-full shadow-lg q-pa-none'):
             # (1) 工具栏
             with ui.row().classes('q-pa-sm gap-2'):
-                ui.button('新增电影', icon='add', on_click=lambda: open_add_dialog()).props('unelevated color=green')
+                ui.button('新增作品', icon='add', on_click=lambda: open_edit_dialog(None)).props(
+                    'unelevated color=green')
                 ui.button('编辑', icon='edit', on_click=lambda: edit_selected()).props('flat color=blue')
                 ui.button('下架', icon='delete', on_click=lambda: delete_selected()).props('flat color=red')
 
-                ui.space()  # 把搜索框挤到右边
+                ui.space()
 
                 with ui.row().classes('items-center no-wrap gap-1'):
-                    # 搜索输入框
                     search_input = ui.input(placeholder='请输入编号或名称') \
                         .props('dense outlined clearable') \
                         .classes('w-64') \
-                        .on('keydown.enter', lambda: load_data())  # 回车也能搜
+                        .on('keydown.enter', lambda: load_data())
 
-                    # 搜索按钮 (点击触发)
                     search_btn = ui.button(icon='search', on_click=lambda: load_data()) \
                         .props('flat round dense color=primary') \
                         .tooltip('点击查询')
 
-                    # 等待提示 (加载圈)
-                    # 默认 visible=False (隐藏)，加载时显示
                     loading_spinner = ui.spinner(size='2em').props('color=primary thickness=4')
                     loading_spinner.visible = False
 
+            # (2) 表格定义 (增加 Type 列)
             grid = ui.aggrid({
                 'columnDefs': [
-                    {'headerName': '编号', 'field': 'tconst', 'checkboxSelection': True},
-                    {'headerName': '电影名称', 'field': 'primaryTitle'},
-                    {'headerName': '上映年份', 'field': 'startYear'},
+                    {'headerName': '编号 (ID)', 'field': 'tconst', 'checkboxSelection': True},
+                    {'headerName': '类型', 'field': 'titleType', 'cellStyle': {'color': 'gray'}},  # 新增
+                    {'headerName': '影视名称', 'field': 'primaryTitle'},
+                    {'headerName': '年份', 'field': 'startYear'},
                     {'headerName': '类型标签', 'field': 'genres'},
                 ],
                 'rowData': [],
@@ -105,78 +115,123 @@ def create_movie_page():
         await load_data()
 
     async def load_data():
-        # --- UI 交互：开始加载 ---
-        loading_spinner.visible = True  # 显示转圈
-        search_btn.disable()  # 禁用按钮防止狂点
-        search_input.disable()  # 禁用输入框
+        loading_spinner.visible = True
+        search_btn.disable()
+        search_input.disable()
 
         try:
-            # 获取搜索词
             query = search_input.value
-
-            # 1. 获取带搜索条件的总是 (用于计算页数)
             total_count = await movie_service.get_movie_count(query)
-
-            # 计算总页数 (防止 total_count=0 时报错)
             total_pages = math.ceil(total_count / page_state['page_size']) if total_count > 0 else 1
 
-            # 搜索时，如果当前页码超过了新的总页数，重置为第1页
             if page_state['current_page'] > total_pages:
                 page_state['current_page'] = 1
 
-            # 2. 获取带搜索条件的数据
             raw_data = await movie_service.get_movies_paginated(
                 page_state['current_page'],
                 page_state['page_size'],
-                search_query=query  # 传入搜索词
+                search_query=query
             )
 
             rows = []
             for m in raw_data:
+                # 转换类型显示 (把 movie 显示为 电影)
+                type_display = TITLE_TYPES.get(m.titleType, m.titleType)
+
                 rows.append({
-                    'tconst': str(m.tconst) if m.tconst else '',
-                    'primaryTitle': str(m.primaryTitle) if m.primaryTitle else '',
-                    'startYear': str(m.startYear) if m.startYear else '',
-                    'genres': str(m.genres) if m.genres else ''
+                    'tconst': str(m.tconst),
+                    'titleType': type_display,  # 显示友好名称
+                    'titleTypeRaw': m.titleType,  # 保留原始值用于编辑回显
+                    'primaryTitle': str(m.primaryTitle or ''),
+                    'startYear': str(m.startYear or ''),
+                    'genres': str(m.genres or '')
                 })
 
-            grid.options['rowData'] = rows
-            grid.update()
-            grid.run_grid_method('setRowData', rows)
             pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页"
 
-            # 只有在非搜索状态下才提示“更新成功”，避免刷屏
+            grid.options['rowData'] = rows
+            await grid.run_grid_method('setRowData', rows, timeout=5.0)
+
+
             if not query:
                 ui.notify('列表已更新', type='positive', timeout=500)
             else:
                 ui.notify(f'查询完成，找到 {total_count} 条结果', type='info', timeout=1000)
 
+
         except Exception as e:
-            ui.notify(f'加载失败: {e}', type='negative')
+            error_msg = str(e)
+            if "JavaScript did not respond" in error_msg:
+                print(f"⚠️ 忽略前端超时警告: {error_msg}")  # 控制台留个底
+            else:
+                ui.notify(f'加载失败: {error_msg}', type='negative')
         finally:
-            # --- UI 交互：结束加载 ---
-            loading_spinner.visible = False  # 隐藏转圈
-            search_btn.enable()  # 恢复按钮
-            search_input.enable()  # 恢复输入框
+            loading_spinner.visible = False
+            search_btn.enable()
+            search_input.enable()
 
-    # --- 5. CRUD 弹窗逻辑 (保留原有逻辑) ---
-    async def open_add_dialog():
+    # --- 5. 弹窗逻辑 (合并新增和编辑) ---
+    def open_edit_dialog(data=None):
+        is_edit = data is not None
+
         with ui.dialog() as dialog, ui.card().classes('w-96'):
-            ui.label('✨ 新增电影').classes('text-h6 font-bold text-green')
-            id_input = ui.input('编号 (如 tt9999999)').classes('w-full')
-            name_input = ui.input('电影名称').classes('w-full')
-            year_input = ui.number('上映年份', format='%.0f').classes('w-full')
-            genres_input = ui.input('类型 (逗号分隔)').classes('w-full')
+            title_text = '编辑作品信息' if is_edit else '✨ 新增影视作品'
+            ui.label(title_text).classes('text-h6 font-bold text-primary')
 
-            async def do_create():
+            # ID 输入框 (新增必填，编辑锁定)
+            id_input = ui.input('编号 (如 tt1234567)', value=data['tconst'] if is_edit else '') \
+                .classes('w-full').props('outlined dense')
+            if is_edit: id_input.disable()
+
+            # 类型选择框 (新增可选，编辑通常锁定或仅展示)
+            # 这里的 options 使用我们定义的字典的 keys
+            type_options = list(TITLE_TYPES.keys())
+            # 如果是编辑，尝试获取原始类型，否则默认为 movie
+            default_type = data['titleTypeRaw'] if is_edit else 'movie'
+
+            type_select = ui.select(
+                options=TITLE_TYPES,  # 使用字典作为选项，会自动显示 value
+                value=default_type,
+                label='作品类型'
+            ).classes('w-full').props('outlined dense')
+
+            # 如果是编辑模式，为了数据一致性，通常不建议随意修改类型（除非你知道你在做什么）
+            # 这里暂时允许修改，或者你可以 .disable()
+            if is_edit: type_select.disable()
+
+            name_input = ui.input('名称', value=data['primaryTitle'] if is_edit else '') \
+                .classes('w-full').props('outlined dense')
+
+            year_input = ui.number('上映年份', value=data['startYear'] if is_edit else None, format='%.0f') \
+                .classes('w-full').props('outlined dense')
+
+            genres_input = ui.input('类型标签 (如 Drama,Action)', value=data['genres'] if is_edit else '') \
+                .classes('w-full').props('outlined dense')
+
+            async def save():
                 if not id_input.value or not name_input.value:
                     ui.notify('编号和名称必填', type='warning')
                     return
-                success, msg = await movie_service.create_movie(
-                    id_input.value, name_input.value,
-                    int(year_input.value) if year_input.value else None,
-                    genres_input.value
-                )
+
+                if is_edit:
+                    # 编辑逻辑 (目前 service 里的 update_movie_details 只更新 title, year, genres)
+                    success = await movie_service.update_movie_details(
+                        id_input.value,
+                        name_input.value,
+                        int(year_input.value) if year_input.value else None,
+                        genres_input.value
+                    )
+                    msg = "更新成功" if success else "更新失败"
+                else:
+                    # 新增逻辑 (需要传递 type)
+                    success, msg = await movie_service.create_movie(
+                        tconst=id_input.value,
+                        title=name_input.value,
+                        year=int(year_input.value) if year_input.value else None,
+                        genres=genres_input.value,
+                        type_str=type_select.value  # 传入选择的类型
+                    )
+
                 if success:
                     ui.notify(msg, type='positive')
                     dialog.close()
@@ -184,9 +239,10 @@ def create_movie_page():
                 else:
                     ui.notify(msg, type='negative')
 
-            with ui.row().classes('w-full justify-end q-mt-md'):
-                ui.button('取消', on_click=dialog.close).props('flat')
-                ui.button('确认', on_click=do_create).props('unelevated color=green')
+            with ui.row().classes('w-full justify-end q-mt-md gap-2'):
+                ui.button('取消', on_click=dialog.close).props('flat color=grey')
+                ui.button('保存', on_click=save).props('unelevated color=primary')
+
         dialog.open()
 
     async def edit_selected():
@@ -194,31 +250,7 @@ def create_movie_page():
         if not selected:
             ui.notify('请先选中一行', type='warning')
             return
-        row = selected[0]
-
-        with ui.dialog() as dialog, ui.card().classes('w-96'):
-            ui.label(f'编辑: {row["tconst"]}').classes('text-h6')
-            name_input = ui.input('电影名称', value=row['primaryTitle']).classes('w-full')
-            year_input = ui.number('上映年份', value=row['startYear'], format='%.0f').classes('w-full')
-            genres_input = ui.input('类型', value=row['genres']).classes('w-full')
-
-            async def do_save():
-                success = await movie_service.update_movie_details(
-                    row['tconst'], name_input.value,
-                    int(year_input.value) if year_input.value else None,
-                    genres_input.value
-                )
-                if success:
-                    ui.notify('已更新', type='positive')
-                    dialog.close()
-                    await load_data()
-                else:
-                    ui.notify('更新失败', type='negative')
-
-            with ui.row().classes('w-full justify-end q-mt-md'):
-                ui.button('取消', on_click=dialog.close).props('flat')
-                ui.button('保存', on_click=do_save).props('unelevated color=primary')
-        dialog.open()
+        open_edit_dialog(selected[0])
 
     async def delete_selected():
         selected = await grid.get_selected_rows()
@@ -234,10 +266,11 @@ def create_movie_page():
                 ui.notify('删除失败', type='negative')
 
         with ui.dialog() as dialog, ui.card():
-            ui.label('确认删除?').classes('font-bold text-red')
-            with ui.row().classes('w-full justify-end'):
+            ui.label('⚠️ 危险操作').classes('font-bold text-red text-lg')
+            ui.label(f"确定要永久删除 {selected[0]['primaryTitle']} 吗？").classes('text-slate-600')
+            with ui.row().classes('w-full justify-end q-mt-md'):
                 ui.button('取消', on_click=dialog.close).props('flat')
-                ui.button('确认', color='red', on_click=do_delete)
+                ui.button('确认删除', color='red', on_click=do_delete).props('unelevated')
         dialog.open()
 
     # 初始加载

@@ -132,13 +132,6 @@ def admin_crew():
 def index():
     user_home.create_user_home()
 
-# @ui.page('/user-center')
-# def user_center_route():
-#     # 权限检查也可以放在这里做一层
-#     if not app.storage.user.get('authenticated', False):
-#         ui.navigate.to('/login')
-#         return
-#     user_center_index.create_page()
 
 @ui.page('/user/favorites')
 def page_user_favorites():

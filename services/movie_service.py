@@ -5,13 +5,10 @@ from models import TitleBasics, TitleRatings, MovieSummary
 
 # --- 数据库操作逻辑 (CRUD) ---
 
-async def create_movie(tconst, title, year, genres):
+async def create_movie(tconst, title, year, genres, type_str='movie'):
     """
-    【新增】创建一部新电影
-    :param tconst: 电影唯一编号 (如 tt1234567)
-    :param title: 电影标题
-    :param year: 上映年份
-    :param genres: 类型字符串
+    【新增】创建一部新作品
+    :param type_str: 作品类型 (movie, tvSeries, etc.)
     """
     async with AsyncSessionLocal() as db:
         try:
@@ -23,10 +20,10 @@ async def create_movie(tconst, title, year, genres):
             # 2. 构造新对象
             new_movie = TitleBasics(
                 tconst=tconst,
-                titleType='movie',
+                titleType=type_str,  # <--- 【关键】使用传入的类型
                 primaryTitle=title,
-                originalTitle=title, # 默认原名与现名一致
-                isAdult=0,          # 默认非成人内容
+                originalTitle=title,
+                isAdult=0,
                 startYear=year,
                 genres=genres
             )

@@ -21,7 +21,7 @@ def create_episode_page():
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
                 'w-full').props('flat')
-            ui.button('电影管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
+            ui.button('影视管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
                 'w-full').props('flat')
             ui.button('评分管理', icon='star', on_click=lambda: ui.navigate.to('/admin/ratings')).classes(
                 'w-full').props('flat')

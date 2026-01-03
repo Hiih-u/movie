@@ -21,7 +21,7 @@ def create_crew_page():
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
                 'w-full').props('flat')
-            ui.button('电影管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
+            ui.button('影视管理', icon='movie', on_click=lambda: ui.navigate.to('/admin/movies')).classes(
                 'w-full').props('flat')
             ui.button('评分管理', icon='star', on_click=lambda: ui.navigate.to('/admin/ratings')).classes(
                 'w-full').props('flat')
@@ -118,11 +118,11 @@ def create_crew_page():
                     'directors': crew_obj.directors,
                     'writers': crew_obj.writers
                 })
-            print(rows)
 
-            await grid.run_grid_method('setGridOption', 'rowData', rows)
+            await grid.run_grid_method('setRowData', rows)
 
             pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页"
+            pagination_label.update()
 
             # 只有在非搜索状态下才提示“更新成功”，避免刷屏
             if not query:
