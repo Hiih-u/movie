@@ -119,24 +119,28 @@ def create_crew_page():
                     'writers': crew_obj.writers
                 })
 
-            await grid.run_grid_method('setRowData', rows)
-
             pagination_label.text = f"第 {page_state['current_page']} 页 / 共 {total_pages} 页"
             pagination_label.update()
 
-            # 只有在非搜索状态下才提示“更新成功”，避免刷屏
+            grid.options['rowData'] = rows
+            await grid.run_grid_method('setRowData', rows)
+
             if not query:
                 ui.notify('列表已更新', type='positive', timeout=500)
             else:
                 ui.notify(f'查询完成，找到 {total_count} 条结果', type='info', timeout=1000)
 
+
         except Exception as e:
-            ui.notify(f'加载失败: {e}', type='negative')
+            error_msg = str(e)
+            if "JavaScript did not respond" in error_msg:
+                print(f"⚠️ 忽略前端超时警告: {error_msg}")  # 控制台留个底
+            else:
+                ui.notify(f'加载失败: {error_msg}', type='negative')
         finally:
-            # --- UI 交互：结束加载 ---
-            loading_spinner.visible = False  # 隐藏转圈
-            search_btn.enable()  # 恢复按钮
-            search_input.enable()  # 恢复输入框
+            loading_spinner.visible = False
+            search_btn.enable()
+            search_input.enable()
 
     async def change_page(delta):
         page_state['current_page'] += delta
