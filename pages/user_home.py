@@ -6,6 +6,52 @@ import random
 BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
 
 
+# --- 【新增】心情推荐弹窗逻辑 ---
+async def open_mood_dialog(mood):
+    # 1. 显示加载中
+    ui.notify(f'正在为您寻找适合 "{mood}" 的电影...', type='info')
+
+    # 2. 调用后端
+    movies = await analysis_service.get_movies_by_mood(mood)
+
+    # 3. 弹出对话框展示结果
+    with ui.dialog() as dialog, ui.card().classes('w-[600px] h-[80vh] p-0 flex flex-col'):
+        # 头部
+        with ui.row().classes('w-full p-4 bg-purple-600 text-white items-center justify-between'):
+            ui.label(f'🎬 {mood} 专属片单').classes('text-lg font-bold')
+            ui.button(icon='close', on_click=dialog.close).props('flat round dense text-color=white')
+
+        # 内容区 (可滚动)
+        with ui.scroll_area().classes('flex-1 p-4'):
+            if not movies:
+                ui.label('哎呀，没找到相关推荐...').classes('text-grey')
+            else:
+                with ui.column().classes('w-full gap-4'):
+                    for m in movies:
+                        with ui.card().classes(
+                                'w-full p-3 shadow-sm border border-gray-100 hover:shadow-md transition-shadow'):
+                            with ui.row().classes('w-full justify-between items-start no-wrap'):
+                                # 左侧：信息
+                                with ui.column().classes('gap-1'):
+                                    ui.label(m['primaryTitle']).classes('font-bold text-md leading-tight')
+                                    with ui.row().classes('items-center gap-2'):
+                                        ui.label(str(m['startYear'])).classes(
+                                            'text-xs text-gray-400 bg-gray-100 px-1 rounded')
+                                        ui.label(m['genres']).classes('text-xs text-purple-400')
+
+                                # 右侧：评分
+                                with ui.column().classes('items-end'):
+                                    ui.label(f"★ {m['averageRating']}").classes('font-bold text-orange-500 text-lg')
+                                    # 这里还可以复用你的“评分/收藏”按钮逻辑
+                                    # ui.button(icon='star', ...).props('flat round dense color=grey')
+
+        # 底部
+        with ui.row().classes('w-full p-3 border-t justify-end bg-gray-50'):
+            ui.button('关闭', on_click=dialog.close).props('unelevated color=purple')
+
+    dialog.open()
+
+
 def create_user_home():
     # 1. 获取用户状态
     username = app.storage.user.get('username', '访客')
@@ -209,6 +255,29 @@ def create_user_home():
                     # === 右侧：侧边栏 ===
                     if is_login and not query:
                         with ui.column().classes('w-80 gap-6 lg:flex'):
+
+                            # ------------------------------------------------------
+                            # 【新增模块】心情推荐 (Mood Picker)
+                            # ------------------------------------------------------
+                            with ui.card().classes(
+                                    'w-full p-5 gap-3 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100'):
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.label('🎭 此刻心情').classes('font-bold text-lg text-purple-900')
+                                    ui.badge('New', color='purple').props('text-color=white dense')
+
+                                ui.label('选一个心情，我懂你想看什么').classes('text-xs text-purple-400')
+
+                                # 心情标签容器
+                                with ui.row().classes('gap-2'):
+                                    # 从 service 获取刚才定义的 keys
+                                    moods = analysis_service.MOOD_MAP.keys()
+
+                                    for m in moods:
+                                        # 点击标签触发函数
+                                        ui.chip(m, on_click=lambda e, mood=m: open_mood_dialog(mood)) \
+                                            .props(
+                                            'clickable color=white text-color=purple-800 icon-right=chevron_right') \
+                                            .classes('shadow-sm hover:bg-purple-100 transition-colors')
 
                             # 模块：猜你喜欢
                             with ui.card().classes('w-full p-5 gap-4 shadow-sm bg-white'):
