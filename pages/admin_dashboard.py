@@ -1,6 +1,6 @@
 from nicegui import ui, app
 import plotly.graph_objects as go
-from services import analysis_service
+from services import analysis_service, recommendation_service
 
 
 def create_admin_page():
@@ -42,6 +42,48 @@ def create_admin_page():
             with ui.card().classes('col q-pa-sm items-center border'):
                 ui.label('全网平均分').classes('text-grey-7 text-xs')
                 avg_label = ui.label('Loading...').classes('text-h5 font-bold text-orange')
+
+        with ui.card().classes('w-full q-mb-md shadow-sm border-t-4 border-purple-500'):
+            with ui.row().classes('w-full items-center justify-between'):
+                with ui.column().classes('gap-0'):
+                    ui.label('🧠 协同过滤推荐引擎').classes('text-h6 font-bold')
+                    # 显示模型当前状态
+                    model_status_label = ui.label('正在检测模型状态...').classes('text-xs text-grey-6')
+
+                # 训练按钮
+                train_btn = ui.button('立即重新训练', icon='psychology', on_click=lambda: run_training()) \
+                    .props('unelevated color=purple')
+
+            # 训练逻辑
+            async def run_training():
+                train_btn.disable()
+                train_btn.text = '训练中(约需几秒)...'
+                model_status_label.text = '⏳ 正在计算相似度矩阵...'
+
+                # 调用后台服务
+                success, msg = await recommendation_service.train_model()
+
+                if success:
+                    ui.notify(msg, type='positive')
+                    refresh_status()  # 刷新显示的文字
+                else:
+                    ui.notify(msg, type='negative')
+                    model_status_label.text = '❌ 上次训练失败'
+
+                train_btn.text = '立即重新训练'
+                train_btn.enable()
+
+            # 刷新状态文字的辅助函数
+            def refresh_status():
+                if recommendation_service._similarity_df is not None:
+                    model_status_label.text = f"✅ 模型已加载 | 算法: Item-Based CF"
+                    model_status_label.classes('text-green-600', remove='text-grey-6 text-red-600')
+                else:
+                    model_status_label.text = "⚠️ 模型未加载 (当前使用热门榜单降级策略)"
+                    model_status_label.classes('text-red-600', remove='text-grey-6 text-green-600')
+
+            # 进入页面时自动检测一次
+            refresh_status()
 
         # --- 图表区域 ---
         with ui.row().classes('w-full gap-4'):

@@ -6,6 +6,7 @@ from pages import (
     person_management, movie_management, rating_management,
     crew_management, register_page, user_home, episode_management, user_favorites, user_ratings
 )
+from services import recommendation_service
 
 # 定义 FastAPI
 app_fastapi = FastAPI()
@@ -148,6 +149,12 @@ def page_user_ratings():
         return
     user_ratings.create_page()
 
+# 【新增】启动事件：加载本地模型
+def handle_startup():
+    print("🚀 系统启动中...")
+    recommendation_service.load_model()
+
+app.on_startup(handle_startup)
 
 # --- 启动配置 ---
 # 注意：storage_secret 是 Session 加密必须的

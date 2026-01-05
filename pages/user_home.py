@@ -1,6 +1,6 @@
 from nicegui import ui, app
 # 【修改 1】导入 interaction_service 服务
-from services import movie_service, analysis_service, interaction_service
+from services import movie_service, analysis_service, interaction_service, recommendation_service
 import random
 
 BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
@@ -218,18 +218,56 @@ def create_user_home():
 
                                 ui.separator()
 
-                                top_movies = await analysis_service.get_top_movies(limit=8)
+                                # --- 【核心修改点】 ---
+                                # 尝试获取个性化推荐
+                                rec_movies = await recommendation_service.get_recommendations(user_id, limit=8)
 
-                                if top_movies:
+                                if rec_movies:
+                                    # 如果有个性化结果，显示“个性化推荐”
+                                    data_source = rec_movies
+                                    ui.label('✨ 根据您的口味生成').classes('text-xs text-purple-500 q-mb-xs')
+                                else:
+                                    # 如果没有（冷启动），回退到 Top 榜单
+                                    # 注意：get_top_movies 返回的是 Row(title, rating)，需要适配一下
+                                    # 为了方便，这里我们简单处理，还是调用 analysis_service
+                                    # 但注意数据格式的区别
+                                    data_source = []
+                                    top_raw = await analysis_service.get_top_movies(limit=8)
+                                    # 适配格式：Top Movies 返回的是 [(Title, Rating), ...]
+                                    # 我们把它转成类似对象的形式，方便下面循环
+                                    for t, r in top_raw:
+                                        data_source.append({'primaryTitle': t, 'averageRating': r})
+
+                                if data_source:
                                     with ui.column().classes('w-full gap-3'):
-                                        for idx, (title, rating) in enumerate(top_movies):
-                                            with ui.row().classes('w-full items-center justify-between group'):
-                                                with ui.row().classes('items-center gap-2 flex-1 overflow-hidden'):
+                                        for idx, m in enumerate(data_source):
+                                            # ... (获取 title 和 rating 的逻辑保持不变) ...
+                                            title = m.primaryTitle if hasattr(m, 'primaryTitle') else m['primaryTitle']
+                                            rating = m.averageRating if hasattr(m, 'averageRating') else m[
+                                                'averageRating']
+
+                                            # 【外层容器】使用 items-start 让所有内容顶部对齐
+                                            with ui.row().classes('w-full items-start justify-between group'):
+                                                # 【左侧容器：数字+标题】
+                                                # 1. flex-nowrap: 强制不换行，保证数字和标题在同一水平线
+                                                # 2. items-start: 数字对齐第一行文字的顶部
+                                                with ui.row().classes('gap-2 flex-1 flex-nowrap items-start'):
                                                     color_cls = 'text-orange-500' if idx < 3 else 'text-slate-400'
-                                                    ui.label(str(idx + 1)).classes(f'font-bold text-sm {color_cls} w-4')
+
+                                                    # 【数字】增加 flex-shrink-0 防止被长标题挤扁
+                                                    ui.label(str(idx + 1)).classes(
+                                                        f'font-bold text-sm {color_cls} w-4 flex-shrink-0 leading-tight')
+
+                                                    # 【标题】
+                                                    # 1. flex-1: 占据剩余空间
+                                                    # 2. break-words: 允许长单词换行
+                                                    # 3. leading-tight: 行间距紧凑一点
                                                     ui.label(title).classes(
-                                                        'text-sm text-slate-600 truncate group-hover:text-primary transition-colors')
-                                                ui.label(str(rating)).classes('text-xs font-bold text-orange-400')
+                                                        'text-sm text-slate-600 group-hover:text-primary transition-colors leading-tight flex-1 break-words')
+
+                                                # 【右侧：评分】
+                                                ui.label(str(rating)).classes(
+                                                    'text-xs font-bold text-orange-400 q-ml-sm')
                                 else:
                                     ui.label('暂无推荐数据').classes('text-sm text-slate-400')
 
