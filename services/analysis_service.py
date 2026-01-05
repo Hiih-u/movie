@@ -1,7 +1,12 @@
 # services/analysis_service.py
+import os
+
 from sqlalchemy import select, func, desc, or_
 from database import AsyncSessionLocal
 from models import TitleBasics, TitleRatings
+# 引入 Hugging Face 的 Pipeline
+from transformers import pipeline
+import functools
 
 MOOD_MAP = {
     '😄 开心': ['Comedy', 'Animation', 'Family', 'Musical'],
@@ -13,6 +18,66 @@ MOOD_MAP = {
     '🤔 烧脑': ['Mystery', 'Sci-Fi', 'Crime']
 }
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOCAL_MODEL_PATH = os.path.join(BASE_DIR, "ml_models", "chinese_xlm_xnli")
+
+@functools.lru_cache(maxsize=1)
+def get_nlp_classifier():
+    print(f"📂 [NLP] 正在加载本地模型: {LOCAL_MODEL_PATH}")
+
+    # 检查 pytorch_model.bin 是否存在 (这是判断下载是否成功的关键)
+    if not os.path.exists(os.path.join(LOCAL_MODEL_PATH, 'pytorch_model.bin')):
+        print("❌ 未找到模型文件！请确认路径正确。")
+        return None
+
+    try:
+        # 加载模型
+        classifier = pipeline("zero-shot-classification", model=LOCAL_MODEL_PATH, tokenizer=LOCAL_MODEL_PATH)
+        print("✅ [NLP] 模型加载完成！")
+        return classifier
+    except Exception as e:
+        print(f"❌ [NLP] 模型加载失败: {e}")
+        return None
+
+
+def analyze_text_mood(text: str):
+    """
+    【深度学习算法】使用 Transformer 进行零样本意图识别
+    """
+    if not text or len(text.strip()) < 2:
+        return None
+
+    try:
+        # 1. 获取模型
+        classifier = get_nlp_classifier()
+
+        # 2. 定义我们的候选标签 (去掉emoji，只要文字部分给AI理解)
+        # MOOD_MAP.keys() 是类似 '😄 开心'，我们只取 '开心'
+        labels_map = {k.split(' ')[1]: k for k in MOOD_MAP.keys()}
+        candidate_labels = list(labels_map.keys())  # ['开心', '难过', '愤怒'...]
+
+        # 3. 让 AI 进行预测
+        # multi_label=False 表示必须要选出一个最像的
+        result = classifier(text, candidate_labels, multi_label=False)
+
+        # 4. 解析结果
+        # result 格式: {'labels': ['难过', '愤怒'...], 'scores': [0.95, 0.02...]}
+        top_label = result['labels'][0]
+        top_score = result['scores'][0]
+
+        print(f"🤖 AI 分析结果: '{text}' -> {top_label} (置信度: {top_score:.2f})")
+
+        # 设置一个阈值，如果 AI 都不太确定（比如置信度低于 0.3），就返回 None
+        if top_score < 0.3:
+            return None
+
+        # 5. 返回带 Emoji 的完整 Key (例如 '😭 难过')
+        return labels_map.get(top_label)
+
+    except Exception as e:
+        print(f"❌ 模型推理失败: {e}")
+        # 降级策略：如果模型挂了，可以用回简单的关键词匹配，或者直接返回 None
+        return None
 
 async def get_movies_by_mood(mood_key: str, limit=12):
     """

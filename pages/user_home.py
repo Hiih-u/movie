@@ -164,10 +164,18 @@ def create_user_home():
                             'w-full h-64 bg-gradient-to-r from-slate-900 to-slate-700 rounded-2xl shadow-lg relative overflow-hidden items-center px-10 text-white'):
                         ui.label('CINEMA').classes(
                             'absolute -right-10 -bottom-10 text-[150px] font-black text-white opacity-5 select-none')
-                        with ui.column().classes('gap-2 z-10 max-w-2xl'):
-                            ui.label('探索电影的无限可能').classes('text-4xl font-bold mb-2')
-                            ui.label('基于千万级 IMDb 数据构建，结合协同过滤算法，为您提供个性化推荐。').classes(
-                                'text-slate-200 text-lg')
+
+                        with ui.column().classes('gap-3 z-10 max-w-3xl'):
+                            # 【修改】去掉 AI，强调“数据”和“引擎”
+                            ui.label('多维数据驱动的智能推荐引擎').classes('text-4xl font-bold mb-1 tracking-wide')
+
+                            # 【修改】强调具体的算法手段
+                            ui.label('基于千万级 IMDb 知识库，深度融合 协同过滤、情感计算 与 语义分析 技术。').classes(
+                                'text-slate-200 text-lg font-medium')
+
+                            with ui.row().classes('items-center gap-2 text-slate-400 text-sm'):
+                                ui.icon('hub', size='xs')  # 换个图标，hub 代表连接/网络
+                                ui.label('不仅是精准推荐，更是连接您与电影世界的智慧桥梁。')
 
                 # --- 核心布局：左右分栏 ---
                 with ui.row().classes('w-full items-start gap-10'):
@@ -255,6 +263,42 @@ def create_user_home():
                     # === 右侧：侧边栏 ===
                     if is_login and not query:
                         with ui.column().classes('w-80 gap-6 lg:flex'):
+
+                            # ------------------------------------------------------
+                            # 【新增】情感树洞 (文字情感分析)
+                            # ------------------------------------------------------
+                            with ui.card().classes(
+                                    'w-full p-5 gap-3 shadow-sm bg-gradient-to-r from-indigo-500 to-purple-600 text-white'):
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.icon('psychology', color='white').classes('text-xl')
+                                    ui.label('情感树洞').classes('font-bold text-lg')
+
+                                ui.label('说出你的故事，树洞 为你配电影').classes('text-xs text-indigo-100')
+
+                                # 文字输入框
+                                mood_input = ui.input(placeholder='例如：今天加班好累...') \
+                                    .props('dark dense standoutless input-class="text-white"') \
+                                    .classes('w-full')
+
+                                async def analyze_and_open():
+                                    if not mood_input.value:
+                                        ui.notify('请先写下您的感受~', type='warning')
+                                        return
+
+                                    # 1. 调用算法分析心情
+                                    detected_mood = analysis_service.analyze_text_mood(mood_input.value)
+
+                                    if detected_mood:
+                                        ui.notify(f'树洞 感知到您可能觉得 "{detected_mood}"', type='positive',
+                                                  icon='auto_awesome')
+                                        # 2. 复用之前的弹窗逻辑打开推荐
+                                        await open_mood_dialog(detected_mood)
+                                    else:
+                                        ui.notify('抱歉，树洞 没读懂您的情绪，试试用更直白的词？', type='info')
+
+                                ui.button('生成推荐', icon='auto_awesome', on_click=analyze_and_open) \
+                                    .props('unelevated color=white text-color=indigo-600 w-full')
+
 
                             # ------------------------------------------------------
                             # 【新增模块】心情推荐 (Mood Picker)

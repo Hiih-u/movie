@@ -49,3 +49,8 @@ pip freeze > requirements.txt
 ```
 
 这会生成一个清单。以后在任何新电脑上，只需运行 `pip install -r requirements.txt`，就能一秒还原你的开发环境。
+
+ml_models 导入文本模型
+git clone https://huggingface.co/morit/chinese_xlm_xnli
+
+https://huggingface.co/morit/chinese_xlm_xnli
