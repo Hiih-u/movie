@@ -92,7 +92,7 @@ pip install pyspark pandas sqlalchemy psycopg2-binary
 ```
 
 
-*(注意：Linux 下 `psycopg2-binary` 是开箱即用的，不需要像 Windows 那样担心编译问题)*
+*(注意：Linux 下 `psycopg2-binary` 是开箱即用的，不需要像 Windows 那样担心编译问题 )*
 
 ---
 
