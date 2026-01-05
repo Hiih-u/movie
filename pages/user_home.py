@@ -331,33 +331,55 @@ def create_user_home():
 
                                 ui.separator()
 
-                                # --- 【核心修改点】 ---
-                                # 尝试获取个性化推荐
-                                rec_movies = await recommendation_service.get_recommendations(user_id, limit=8)
+                                # --- 推荐策略逻辑 ---
 
-                                if rec_movies:
-                                    # 如果有个性化结果，显示“个性化推荐”
-                                    data_source = rec_movies
-                                    ui.label('✨ 根据您的口味生成').classes('text-xs text-purple-500 q-mb-xs')
+                                # 1. 优先尝试：Spark 离线推荐
+                                # 【新增】打印尝试日志
+                                print(f"🔍 [RecSys] 正在尝试获取用户 {user_id} 的 Spark 离线推荐...")
+                                data_source = await recommendation_service.get_spark_recommendations(user_id, limit=8)
+                                is_personalized = True
+
+                                if data_source:
+                                    # 【新增】如果拿到了数据，打印成功日志
+                                    print(f"✅ [RecSys] 命中 Spark 推荐！获取到 {len(data_source)} 部电影。")
                                 else:
-                                    # 如果没有（冷启动），回退到 Top 榜单
-                                    # 注意：get_top_movies 返回的是 Row(title, rating)，需要适配一下
-                                    # 为了方便，这里我们简单处理，还是调用 analysis_service
-                                    # 但注意数据格式的区别
-                                    data_source = []
+                                    print(f"⚠️ [RecSys] Spark 表中无此用户数据，降级尝试实时协同过滤...")
+
+                                # 2. 降级尝试：实时协同过滤
+                                if not data_source:
+                                    data_source = await recommendation_service.get_recommendations(user_id, limit=8)
+                                    if data_source:
+                                        print(f"✅ [RecSys] 命中 实时协同过滤推荐！")
+                                    else:
+                                        print(f"⚠️ [RecSys] 实时推荐无结果（可能是冷启动用户），降级到热门榜单...")
+
+                                # 3. 最终兜底：热门榜单
+                                if not data_source:
+                                    is_personalized = False
+                                    print(f"🔥 [RecSys] 使用 热门榜单 兜底。")
+
                                     top_raw = await analysis_service.get_top_movies(limit=8)
-                                    # 适配格式：Top Movies 返回的是 [(Title, Rating), ...]
-                                    # 我们把它转成类似对象的形式，方便下面循环
+                                    data_source = []
                                     for t, r in top_raw:
                                         data_source.append({'primaryTitle': t, 'averageRating': r})
+
+                                # --- UI 渲染逻辑 ---
+
+                                # 如果是个性化推荐 (Spark 或 CF)，显示紫色小标签
+                                if is_personalized and data_source:
+                                    ui.label('✨ 根据您的口味生成').classes('text-xs text-purple-500 q-mb-xs')
+
+                                # 如果是热门推荐，可以显示另一个提示 (可选)
+                                elif not is_personalized and data_source:
+                                    ui.label('🔥 大家都爱看 (数据不足时的默认推荐)').classes(
+                                        'text-xs text-orange-400 q-mb-xs')
 
                                 if data_source:
                                     with ui.column().classes('w-full gap-3'):
                                         for idx, m in enumerate(data_source):
                                             # ... (获取 title 和 rating 的逻辑保持不变) ...
                                             title = m.primaryTitle if hasattr(m, 'primaryTitle') else m['primaryTitle']
-                                            rating = m.averageRating if hasattr(m, 'averageRating') else m[
-                                                'averageRating']
+                                            rating = m.averageRating if hasattr(m, 'averageRating') else m['averageRating']
 
                                             # 【外层容器】使用 items-start 让所有内容顶部对齐
                                             with ui.row().classes('w-full items-start justify-between group'):

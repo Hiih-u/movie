@@ -2,10 +2,11 @@
 import pandas as pd
 import pickle
 import os
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sklearn.metrics.pairwise import cosine_similarity
 from database import AsyncSessionLocal
 from models import UserRating, MovieSummary, UserFavorite
+from models import SparkRecommendation
 
 # === 【修改】路径配置 ===
 # 1. 获取当前文件(recommendation_service.py) 的上一级目录 -> 即 services/
@@ -190,3 +191,31 @@ async def get_recommendations(user_id: int, limit=8):
                 ordered_movies.append(movies_map[mid])
 
         return ordered_movies
+
+
+async def get_spark_recommendations(user_id: int, limit=8):
+    """
+    获取 Spark 离线计算的推荐结果
+    """
+    async with AsyncSessionLocal() as db:
+        # 1. 直接查表
+        stmt = (
+            select(SparkRecommendation.tconst)
+            .where(SparkRecommendation.user_id == user_id)
+            .order_by(desc(SparkRecommendation.score))
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        tconsts = res.scalars().all()
+
+        if not tconsts:
+            return []
+
+        # 2. 查电影详情
+        movies_stmt = select(MovieSummary).where(MovieSummary.tconst.in_(tconsts))
+        movies_res = await db.execute(movies_stmt)
+        movies = movies_res.scalars().all()
+
+        # 按推荐顺序排序
+        movies_map = {m.tconst: m for m in movies}
+        return [movies_map[tid] for tid in tconsts if tid in movies_map]

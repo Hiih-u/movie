@@ -137,3 +137,15 @@ class UserRating(Base):
     rating = Column(Float)  # 用户打分 (e.g. 1.0 - 10.0)
     created_at = Column(DateTime, default=datetime.now)
 
+
+class SparkRecommendation(Base):
+    """
+    存储 Spark 离线计算好的推荐结果
+    """
+    __tablename__ = "spark_recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)  # 给谁推荐
+    tconst = Column(String, index=True)    # 推荐了哪部电影
+    score = Column(Float)                  # 推荐分数 (预测评分)
+    algorithm = Column(String, default="ALS") # 算法名称，方便以后对比
