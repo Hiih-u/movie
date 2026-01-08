@@ -1,5 +1,6 @@
 # services/analysis_service.py
 import os
+from datetime import datetime
 
 from sqlalchemy import select, func, desc, or_
 from database import AsyncSessionLocal
@@ -132,19 +133,34 @@ async def get_top_movies(limit=10):
         result = await db.execute(query)
         return result.all()
 
+
 async def get_year_stats(limit=20):
-    """统计近 N 年的影视产量分布"""
+    """统计近 N 年的影视产量分布 (排除未来年份)"""
+
+    # 1. 获取当前年份 (比如 2026)
+    current_year = datetime.now().year
+
     async with AsyncSessionLocal() as db:
         query = (
             select(TitleBasics.startYear, func.count(TitleBasics.tconst))
             .where(TitleBasics.titleType.in_(['movie', 'tvSeries', 'tvMiniSeries', 'tvMovie']))
             .where(TitleBasics.startYear.is_not(None))
+
+            # === 【核心修改】只取今年及以前的数据 ===
+            .where(TitleBasics.startYear <= current_year)
+            # ====================================
+
             .group_by(TitleBasics.startYear)
             .order_by(desc(TitleBasics.startYear))
             .limit(limit)
         )
         result = await db.execute(query)
-        return result.all()
+
+        # 结果倒序 (比如 2026, 2025...)
+        # 为了 ECharts折线图好看，前端通常需要正序 (..., 2025, 2026)
+        # 可以在这里翻转一下，或者交给前端翻转
+        data = result.all()
+        return list(reversed(data))  # 翻转列表，变成从旧到新
 
 async def get_stats_summary():
     """获取总数和平均分概览"""
