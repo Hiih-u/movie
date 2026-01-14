@@ -1,0 +1,27 @@
+# --- 1. Python 基础 ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- 2. 虚拟环境 ---
+venv/
+.venv/
+env/
+
+# --- 3. 项目特定数据与模型 ---
+ml_models/
+data/
+*.tsv
+*.tsv.gz
+
+# --- [新增] NiceGUI 本地存储 ---
+# 存放 app.storage 的本地数据，包含 Session 等，不要提交
+.nicegui/
+
+# --- 4. IDE 配置 ---
+.idea/
+.vscode/
+
+# --- 5. 系统文件 ---
+.DS_Store
+Thumbs.db
