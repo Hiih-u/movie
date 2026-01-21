@@ -111,30 +111,28 @@ async def get_movie_count(search_query=None):
 async def refresh_movie_summary():
     """
     全量刷新 movie_summary 表
-    修正：源表(title_basics, title_ratings)的列名使用小写，目标表(movie_summary)保持模型定义的大小写
     """
     async with AsyncSessionLocal() as db:
         try:
             # 1. 清空旧表
             await db.execute(text("TRUNCATE TABLE movie_summary"))
 
-            # 2. 执行插入
-            # 注意：
-            # - INSERT INTO 部分：对应 MovieSummary 表的列名，SQLAlchemy 默认创建为 "primaryTitle" (带引号区分大小写)
-            # - SELECT 部分：对应 title_basics/ratings 表的真实列名，全都是小写！
+            # 2. 执行插入 (注意新增了 titleType 字段)
+            # 我们直接从 title_basics 表里取 titletype
             stmt = text("""
-                        INSERT INTO movie_summary (tconst, "primaryTitle", "startYear", "runtimeMinutes", genres,
+                        INSERT INTO movie_summary (tconst, "titleType", "primaryTitle", "startYear", "runtimeMinutes", genres,
                                                    "averageRating", "numVotes")
                         SELECT b.tconst,
-                               b.primarytitle,   -- 改为小写
-                               b.startyear,      -- 改为小写
-                               b.runtimeminutes, -- 改为小写
+                               b.titletype,      -- 【新增】写入类型
+                               b.primarytitle,
+                               b.startyear,
+                               b.runtimeminutes,
                                b.genres,
-                               r.averagerating,  -- 改为小写
-                               r.numvotes        -- 改为小写
+                               r.averagerating,
+                               r.numvotes
                         FROM title_basics b
                                  LEFT JOIN title_ratings r ON b.tconst = r.tconst
-                        WHERE b.titletype IN ('movie', 'tvSeries', 'tvMiniSeries', 'tvMovie')
+                        WHERE b.titletype IN ('movie', 'tvSeries', 'tvMiniSeries', 'tvMovie', 'short')
                         """)
             await db.execute(stmt)
             await db.commit()
@@ -145,27 +143,56 @@ async def refresh_movie_summary():
 
 
 # --- 【修改】首页查询接口 (改用新表) ---
-async def get_homepage_movies(page: int, page_size: int, search_query=None):
+async def get_homepage_movies(page: int, page_size: int, search_query=None, category='all'):
     """
-    【极速版】首页查询
-    直接查 movie_summary 单表，无需 Join
+    支持分类筛选的首页查询
+    :param category: 'all' | 'movie' | 'tv' | 'anime' | 'variety' | 'doc'
     """
     offset = (page - 1) * page_size
     async with AsyncSessionLocal() as db:
-        # 直接查 MovieSummary
         query = select(MovieSummary)
 
+        # --- 1. 处理搜索 ---
         if search_query:
-            # 这里的字段名要和 MovieSummary 定义的一致
             query = query.where(MovieSummary.primaryTitle.ilike(f"%{search_query}%"))
-            # 搜索时按匹配度/ID排序
+
+        # --- 2. 处理分类导航 (核心逻辑) ---
+        if category == 'movie':
+            # 电影：类型为 movie 或 tvMovie
+            query = query.where(MovieSummary.titleType.in_(['movie', 'tvMovie']))
+            # 排除动漫和纪录片，防止混杂 (可选)
+            query = query.where(MovieSummary.genres.notilike('%Animation%'))
+            query = query.where(MovieSummary.genres.notilike('%Documentary%'))
+
+        elif category == 'tv':
+            # 剧集：类型为 tvSeries 或 tvMiniSeries
+            query = query.where(MovieSummary.titleType.in_(['tvSeries', 'tvMiniSeries']))
+            # 排除动漫
+            query = query.where(MovieSummary.genres.notilike('%Animation%'))
+
+        elif category == 'anime':
+            # 动漫：类型不限，但题材必须包含 Animation
+            query = query.where(MovieSummary.genres.ilike('%Animation%'))
+
+        elif category == 'variety':
+            # 综艺：IMDb 中通常是 Reality-TV, Talk-Show, Game-Show
+            query = query.where(or_(
+                MovieSummary.genres.ilike('%Reality-TV%'),
+                MovieSummary.genres.ilike('%Talk-Show%'),
+                MovieSummary.genres.ilike('%Game-Show%')
+            ))
+
+        elif category == 'doc':
+            # 纪录片
+            query = query.where(MovieSummary.genres.ilike('%Documentary%'))
+
+        # --- 3. 排序 (按热度) ---
+        if search_query:
             query = query.order_by(MovieSummary.tconst)
         else:
-            # 首页默认按热度倒序 (利用 numVotes 索引)
             query = query.order_by(desc(MovieSummary.numVotes).nulls_last())
 
         query = query.offset(offset).limit(page_size)
         result = await db.execute(query)
 
-        # 返回的是 MovieSummary 对象列表 (不是元组了！)
         return result.scalars().all()

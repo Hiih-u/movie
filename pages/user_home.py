@@ -1,27 +1,31 @@
 from nicegui import ui, app
-# 【修改 1】导入 interaction_service 服务
 from services import movie_service, analysis_service, interaction_service, recommendation_service
 import random
 
+# 卡片背景色池
 BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
 
+# --- [新增] 导航菜单配置 ---
+NAV_ITEMS = [
+    {'label': '全部', 'value': 'all', 'icon': 'apps'},
+    {'label': '电影', 'value': 'movie', 'icon': 'movie'},
+    {'label': '电视剧', 'value': 'tv', 'icon': 'tv'},
+    {'label': '动漫', 'value': 'anime', 'icon': 'palette'},
+    {'label': '综艺', 'value': 'variety', 'icon': 'mic'},
+    {'label': '纪录片', 'value': 'doc', 'icon': 'menu_book'}
+]
 
-# --- 【新增】心情推荐弹窗逻辑 ---
+
+# --- 情感推荐弹窗逻辑 (保持不变) ---
 async def open_mood_dialog(mood):
-    # 1. 显示加载中
     ui.notify(f'正在为您寻找适合 "{mood}" 的电影...', type='info')
-
-    # 2. 调用后端
     movies = await analysis_service.get_movies_by_mood(mood)
 
-    # 3. 弹出对话框展示结果
     with ui.dialog() as dialog, ui.card().classes('w-[600px] h-[80vh] p-0 flex flex-col'):
-        # 头部
         with ui.row().classes('w-full p-4 bg-purple-600 text-white items-center justify-between'):
             ui.label(f'🎬 {mood} 专属片单').classes('text-lg font-bold')
             ui.button(icon='close', on_click=dialog.close).props('flat round dense text-color=white')
 
-        # 内容区 (可滚动)
         with ui.scroll_area().classes('flex-1 p-4'):
             if not movies:
                 ui.label('哎呀，没找到相关推荐...').classes('text-grey')
@@ -31,24 +35,17 @@ async def open_mood_dialog(mood):
                         with ui.card().classes(
                                 'w-full p-3 shadow-sm border border-gray-100 hover:shadow-md transition-shadow'):
                             with ui.row().classes('w-full justify-between items-start no-wrap'):
-                                # 左侧：信息
                                 with ui.column().classes('gap-1'):
                                     ui.label(m['primaryTitle']).classes('font-bold text-md leading-tight')
                                     with ui.row().classes('items-center gap-2'):
                                         ui.label(str(m['startYear'])).classes(
                                             'text-xs text-gray-400 bg-gray-100 px-1 rounded')
                                         ui.label(m['genres']).classes('text-xs text-purple-400')
-
-                                # 右侧：评分
                                 with ui.column().classes('items-end'):
                                     ui.label(f"★ {m['averageRating']}").classes('font-bold text-orange-500 text-lg')
-                                    # 这里还可以复用你的“评分/收藏”按钮逻辑
-                                    # ui.button(icon='star', ...).props('flat round dense color=grey')
 
-        # 底部
         with ui.row().classes('w-full p-3 border-t justify-end bg-gray-50'):
             ui.button('关闭', on_click=dialog.close).props('unelevated color=purple')
-
     dialog.open()
 
 
@@ -57,85 +54,62 @@ def create_user_home():
     username = app.storage.user.get('username', '访客')
     is_login = app.storage.user.get('authenticated', False)
     user_role = app.storage.user.get('role', 'user')
-    # 【修改 2】获取 user_id (用于数据库操作)
     user_id = app.storage.user.get('user_id', None)
 
-    # --- 导航栏 ---
+    # [新增] 当前选中的分类 (默认全部)
+    current_category = {'value': 'all'}
+
+    # --- 顶部导航栏 ---
     with ui.header().classes('bg-white text-slate-900 shadow-sm border-b items-center h-16 px-6'):
-        # 1. Logo 区域
         with ui.row().classes('items-center gap-2 cursor-pointer'):
             ui.icon('movie_filter', color='primary').classes('text-3xl')
-            ui.label('MovieRec Sys').classes('text-xl font-bold text-primary tracking-tight')
+            ui.label('影视系统').classes('text-xl font-bold text-primary tracking-tight')
 
-        # 2. 搜索区域
         with ui.row().classes('items-center gap-0 ml-12'):
             search_input = ui.input(placeholder='搜索电影...').props('rounded-l outlined dense').classes('w-60 md:w-80')
             search_input.on('keydown.enter', lambda: load_movies(query=search_input.value))
-
             ui.button(icon='search', on_click=lambda: load_movies(query=search_input.value)) \
-                .props('unelevated rounded-r color=primary dense') \
-                .classes('h-10 px-4')
+                .props('unelevated rounded-r color=primary dense').classes('h-10 px-4')
 
-        # 3. 唯一的空格：把后面的内容（登录/头像）推到最右边
         ui.space()
 
         if is_login:
             with ui.row().classes('items-center gap-3'):
                 ui.avatar(username[0].upper(), color='primary', text_color='white').props('size=sm font-size=14px')
                 ui.label(f'{username}').classes('font-medium text-slate-600')
-
                 if user_role == 'admin':
                     ui.button('后台管理', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')) \
-                        .props('outline rounded-full dense color=primary') \
-                        .classes('px-4') \
-                        .tooltip('进入系统后台')
-
+                        .props('outline rounded-full dense color=primary').classes('px-4')
                 ui.button(icon='logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))) \
-                    .props('flat round dense color=grey') \
-                    .tooltip('退出登录')
+                    .props('flat round dense color=grey')
         else:
             ui.button('登录', on_click=lambda: ui.navigate.to('/login')).props('unelevated color=primary')
 
-    # --- 主容器 ---
+    # --- 主内容容器 ---
     content_div = ui.column().classes('w-full min-h-screen bg-slate-50 items-center')
 
-    # --- 【修改 3】交互逻辑函数 (收藏与评分) ---
-
+    # --- 交互逻辑 (收藏/评分) ---
     async def toggle_fav(e, tconst):
-        """点击收藏/取消收藏"""
         if not is_login:
             ui.notify('请先登录', type='warning')
             return
-
-        # 调用后端切换状态
         is_added, msg = await interaction_service.toggle_favorite(user_id, tconst)
         ui.notify(msg, type='positive' if is_added else 'info')
-
-        # 刷新当前图标状态
         btn = e.sender
-        if is_added:
-            btn.props('icon=favorite color=red')
-        else:
-            btn.props('icon=favorite_border color=white')
+        btn.props('icon=favorite color=red' if is_added else 'icon=favorite_border color=white')
 
     def open_rate_dialog(tconst, title, current_score=0):
-        """打开评分弹窗"""
         if not is_login:
             ui.notify('请先登录', type='warning')
             return
-
         with ui.dialog() as dialog, ui.card().classes('w-96'):
             ui.label(f'给 "{title}" 打分').classes('text-lg font-bold')
-            ui.label('拖动滑块进行评价 (1-10分)').classes('text-xs text-slate-400')
-
-            # 滑块组件 (默认值设为8.0或当前评分)
             slider = ui.slider(min=1, max=10, step=0.5, value=current_score or 8.0).props('label-always color=orange')
 
             async def save():
                 await interaction_service.set_user_rating(user_id, tconst, slider.value)
                 ui.notify('评分成功！', type='positive')
                 dialog.close()
-                # 刷新列表以更新显示的“我的评分”
                 await load_movies(search_input.value)
 
             with ui.row().classes('w-full justify-end q-mt-md'):
@@ -143,12 +117,11 @@ def create_user_home():
                 ui.button('提交', on_click=save).props('unelevated color=orange')
         dialog.open()
 
-    # --- 加载数据主逻辑 ---
-
+    # --- [核心] 加载数据逻辑 ---
     async def load_movies(query=None):
         content_div.clear()
 
-        # 【修改 4】预先获取当前用户的收藏列表和评分字典
+        # 预加载用户数据
         my_favs = set()
         my_ratings = {}
         if is_login and user_id:
@@ -156,67 +129,80 @@ def create_user_home():
             my_ratings = await interaction_service.get_user_ratings_map(user_id)
 
         with content_div:
-            with ui.column().classes('w-full max-w-[1400px] p-6 gap-8'):
+            with ui.column().classes('w-full max-w-[1400px] p-6 gap-6'):
 
-                # --- A. Banner (仅首页显示) ---
-                if not query:
+                # 1. 顶部 Banner (仅在 "全部" 分类且无搜索时显示)
+                if not query and current_category['value'] == 'all':
                     with ui.row().classes(
                             'w-full h-64 bg-gradient-to-r from-slate-900 to-slate-700 rounded-2xl shadow-lg relative overflow-hidden items-center px-10 text-white'):
                         ui.label('CINEMA').classes(
                             'absolute -right-10 -bottom-10 text-[150px] font-black text-white opacity-5 select-none')
-
                         with ui.column().classes('gap-3 z-10 max-w-3xl'):
-                            # 【修改】去掉 AI，强调“数据”和“引擎”
-                            ui.label('多维数据驱动的智能推荐引擎').classes('text-4xl font-bold mb-1 tracking-wide')
-
-                            # 【修改】强调具体的算法手段
-                            ui.label('基于千万级 IMDb 知识库，深度融合 协同过滤、情感计算 与 语义分析 技术。').classes(
+                            ui.label('基于 Python 的影视推荐系统').classes('text-4xl font-bold mb-1 tracking-wide')
+                            ui.label('千万级 IMDb 知识库，深度融合 协同过滤、情感计算 与 语义分析 技术。').classes(
                                 'text-slate-200 text-lg font-medium')
-
                             with ui.row().classes('items-center gap-2 text-slate-400 text-sm'):
-                                ui.icon('hub', size='xs')  # 换个图标，hub 代表连接/网络
+                                ui.icon('hub', size='xs')
                                 ui.label('不仅是精准推荐，更是连接您与电影世界的智慧桥梁。')
 
-                # --- 核心布局：左右分栏 ---
+                # 2. [新增] 分类导航栏 (无搜索时显示)
+                if not query:
+                    with ui.card().classes(
+                            'w-full p-2 shadow-sm bg-white sticky top-0 z-40 rounded-xl border border-slate-100'):
+                        with ui.row().classes('gap-2 justify-center'):
+                            for item in NAV_ITEMS:
+                                is_active = (current_category['value'] == item['value'])
+                                btn_props = 'unelevated' if is_active else 'flat'
+                                btn_color = 'primary' if is_active else 'grey-8'
+                                # 点击切换分类
+                                ui.button(item['label'], icon=item['icon'],
+                                          on_click=lambda _, v=item['value']: switch_category(v)) \
+                                    .props(f'{btn_props} rounded color={btn_color}') \
+                                    .classes('px-5 font-bold transition-all')
+
+                # 3. 主内容区：左右分栏
                 with ui.row().classes('w-full items-start gap-10'):
 
-                    # === 左侧：热门片库 ===
+                    # === 左侧：片库列表 ===
                     with ui.column().classes('flex-1 w-full gap-6'):
-                        with ui.row().classes('w-full justify-between items-end'):
-                            title = f'🔍 "{query}" 搜索结果' if query else '📚 热门片库'
-                            ui.label(title).classes('text-2xl font-bold text-slate-800')
-                            if not query:
-                                ui.label('数据来源: IMDb Datasets').classes('text-xs text-slate-400')
+                        # 动态标题
+                        cat_label = next((x['label'] for x in NAV_ITEMS if x['value'] == current_category['value']),
+                                         '列表')
+                        title_text = f'🔍 "{query}" 搜索结果' if query else f'📚 {cat_label}精选'
 
-                        movies = await movie_service.get_homepage_movies(page=1, page_size=24, search_query=query)
+                        with ui.row().classes('w-full justify-between items-end'):
+                            ui.label(title_text).classes('text-2xl font-bold text-slate-800')
+                            if not query: ui.label('数据来源: IMDb Datasets').classes('text-xs text-slate-400')
+
+                        # 调用 Service (传入 category)
+                        movies = await movie_service.get_homepage_movies(
+                            page=1,
+                            page_size=24,
+                            search_query=query,
+                            category=current_category['value']
+                        )
 
                         if not movies:
-                            ui.label('暂无数据').classes('text-slate-400 py-10')
+                            ui.label('该分类下暂无数据...').classes('text-slate-400 py-10')
                         else:
-                            # Grid 3 列
                             with ui.grid(columns=3).classes('w-full gap-6'):
                                 for index, m in enumerate(movies):
                                     bg = BG_COLORS[index % len(BG_COLORS)]
-
                                     display_rating = str(m.averageRating) if m.averageRating else 'N/A'
-                                    display_runtime = f"{m.runtimeMinutes}" if m.runtimeMinutes else "?"
 
-                                    # 卡片容器 (增加 relative 以便定位收藏按钮)
                                     with ui.card().classes(
                                             'w-full h-[320px] p-0 gap-0 shadow hover:shadow-lg transition-all group relative'):
-
-                                        # 【修改 5】右上角收藏按钮 (绝对定位)
+                                        # 收藏按钮
                                         if is_login:
                                             is_fav = m.tconst in my_favs
                                             fav_icon = 'favorite' if is_fav else 'favorite_border'
                                             fav_color = 'red' if is_fav else 'white'
-
                                             ui.button(icon=fav_icon,
                                                       on_click=lambda e, mid=m.tconst: toggle_fav(e, mid)) \
                                                 .props(f'flat round color={fav_color} dense') \
                                                 .classes('absolute top-2 right-2 z-20 bg-black/20 backdrop-blur-sm')
 
-                                        # 封面区
+                                        # 封面
                                         with ui.column().classes(
                                                 f'w-full h-[55%] {bg} items-center justify-center relative overflow-hidden'):
                                             ui.label(m.primaryTitle[:1]).classes(
@@ -224,211 +210,139 @@ def create_user_home():
                                             ui.label(str(m.startYear)).classes(
                                                 'absolute bottom-2 left-2 bg-black/40 text-white text-xs px-2 rounded-full')
 
-                                        # 内容区
+                                        # 内容
                                         with ui.column().classes('w-full h-[45%] p-3 justify-between bg-white'):
                                             ui.label(m.primaryTitle).classes(
                                                 'font-bold text-sm leading-tight line-clamp-2 h-10 text-slate-800')
-
                                             with ui.row().classes('gap-1'):
-                                                for g in (m.genres or '').split(',')[:2]:
+                                                # 简单的类型展示
+                                                genres = (m.genres or '').split(',')[:2]
+                                                for g in genres:
                                                     ui.label(g).classes(
                                                         'text-[10px] text-slate-500 bg-slate-100 px-1.5 rounded')
-
                                             ui.separator().classes('my-1')
 
-                                            # 【修改 6】底部信息栏：左侧 IMDb 分，右侧“我的评分”
-                                            with ui.row().classes(
-                                                    'w-full justify-between items-center'):
-                                                # IMDb 评分
+                                            with ui.row().classes('w-full justify-between items-center'):
                                                 ui.label(f'IMDb: {display_rating}').classes(
                                                     'text-xs font-bold text-slate-500')
-
-                                                # 用户评分按钮
                                                 if is_login:
                                                     my_score = my_ratings.get(m.tconst)
-                                                    # 如果评过分，显示分数；没评过，显示“打分”
                                                     btn_text = str(my_score) if my_score else '打分'
                                                     btn_color = 'orange' if my_score else 'grey-5'
-                                                    btn_icon = 'star' if my_score else 'star_outline'
-
-                                                    ui.button(btn_text, icon=btn_icon,
+                                                    ui.button(btn_text, icon='star' if my_score else 'star_outline',
                                                               on_click=lambda mid=m.tconst, t=m.primaryTitle,
                                                                               s=my_score: open_rate_dialog(mid, t, s)) \
-                                                        .props(f'flat dense size=sm color={btn_color}') \
-                                                        .tooltip('点击进行个人评分')
+                                                        .props(f'flat dense size=sm color={btn_color}')
                                                 else:
-                                                    # 未登录只显示时长
-                                                    ui.label(f'{display_runtime} min').classes('text-xs text-slate-400')
+                                                    ui.label(f'{m.runtimeMinutes or "?"} min').classes(
+                                                        'text-xs text-slate-400')
 
                     # === 右侧：侧边栏 ===
                     if is_login and not query:
-                        with ui.column().classes('w-80 gap-6 lg:flex'):
+                        with ui.column().classes('w-80 gap-6 flex-none'):  # 移动端隐藏侧边栏
 
-                            # ------------------------------------------------------
-                            # 【新增】情感树洞 (文字情感分析)
-                            # ------------------------------------------------------
+                            # 1. 情感树洞
                             with ui.card().classes(
                                     'w-full p-5 gap-3 shadow-sm bg-gradient-to-r from-indigo-500 to-purple-600 text-white'):
                                 with ui.row().classes('items-center gap-2'):
                                     ui.icon('psychology', color='white').classes('text-xl')
                                     ui.label('情感树洞').classes('font-bold text-lg')
-
                                 ui.label('说出你的故事，树洞 为你配电影').classes('text-xs text-indigo-100')
-
-                                # 文字输入框
                                 mood_input = ui.input(placeholder='例如：今天加班好累...') \
-                                    .props('dark dense standoutless input-class="text-white"') \
-                                    .classes('w-full')
+                                    .props('dark dense standoutless input-class="text-white"').classes('w-full')
 
                                 async def analyze_and_open():
                                     if not mood_input.value:
                                         ui.notify('请先写下您的感受~', type='warning')
                                         return
-
-                                    # 1. 调用算法分析心情
                                     detected_mood = analysis_service.analyze_text_mood(mood_input.value)
-
                                     if detected_mood:
-                                        ui.notify(f'树洞 感知到您可能觉得 "{detected_mood}"', type='positive',
+                                        ui.notify(f'感知到您可能觉得 "{detected_mood}"', type='positive',
                                                   icon='auto_awesome')
-                                        # 2. 复用之前的弹窗逻辑打开推荐
                                         await open_mood_dialog(detected_mood)
                                     else:
-                                        ui.notify('抱歉，树洞 没读懂您的情绪，试试用更直白的词？', type='info')
+                                        ui.notify('抱歉，没读懂您的情绪，请试着换个说法', type='info')
 
                                 ui.button('生成推荐', icon='auto_awesome', on_click=analyze_and_open) \
                                     .props('unelevated color=white text-color=indigo-600 w-full')
 
-
-                            # ------------------------------------------------------
-                            # 【新增模块】心情推荐 (Mood Picker)
-                            # ------------------------------------------------------
+                            # 2. 心情推荐
                             with ui.card().classes(
                                     'w-full p-5 gap-3 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100'):
                                 with ui.row().classes('items-center gap-2'):
                                     ui.label('🎭 此刻心情').classes('font-bold text-lg text-purple-900')
                                     ui.badge('New', color='purple').props('text-color=white dense')
-
-                                ui.label('选一个心情，我懂你想看什么').classes('text-xs text-purple-400')
-
-                                # 心情标签容器
                                 with ui.row().classes('gap-2'):
-                                    # 从 service 获取刚才定义的 keys
-                                    moods = analysis_service.MOOD_MAP.keys()
-
-                                    for m in moods:
-                                        # 点击标签触发函数
+                                    for m in analysis_service.MOOD_MAP.keys():
                                         ui.chip(m, on_click=lambda e, mood=m: open_mood_dialog(mood)) \
                                             .props(
-                                            'clickable color=white text-color=purple-800 icon-right=chevron_right') \
-                                            .classes('shadow-sm hover:bg-purple-100 transition-colors')
+                                            'clickable color=white text-color=purple-800 icon-right=chevron_right').classes(
+                                            'shadow-sm')
 
-                            # 模块：猜你喜欢
+                            # 3. 猜你喜欢 (推荐系统)
                             with ui.card().classes('w-full p-5 gap-4 shadow-sm bg-white'):
                                 with ui.row().classes('items-center gap-2'):
                                     ui.icon('recommend', color='orange').classes('text-xl')
                                     ui.label('猜你喜欢').classes('font-bold text-lg text-slate-800')
-
                                 ui.separator()
 
-                                # --- 推荐策略逻辑 ---
-
-                                # 1. 优先尝试：Spark 离线推荐
-                                # 【新增】打印尝试日志
-                                print(f"🔍 [RecSys] 正在尝试获取用户 {user_id} 的 Spark 离线推荐...")
+                                # 推荐策略：Spark -> 实时CF -> 热门
                                 data_source = await recommendation_service.get_spark_recommendations(user_id, limit=8)
                                 is_personalized = True
-
-                                if data_source:
-                                    # 【新增】如果拿到了数据，打印成功日志
-                                    print(f"✅ [RecSys] 命中 Spark 推荐！获取到 {len(data_source)} 部电影。")
-                                else:
-                                    print(f"⚠️ [RecSys] Spark 表中无此用户数据，降级尝试实时协同过滤...")
-
-                                # 2. 降级尝试：实时协同过滤
                                 if not data_source:
                                     data_source = await recommendation_service.get_recommendations(user_id, limit=8)
-                                    if data_source:
-                                        print(f"✅ [RecSys] 命中 实时协同过滤推荐！")
-                                    else:
-                                        print(f"⚠️ [RecSys] 实时推荐无结果（可能是冷启动用户），降级到热门榜单...")
-
-                                # 3. 最终兜底：热门榜单
                                 if not data_source:
                                     is_personalized = False
-                                    print(f"🔥 [RecSys] 使用 热门榜单 兜底。")
-
                                     top_raw = await analysis_service.get_top_movies(limit=8)
-                                    data_source = []
-                                    for t, r in top_raw:
-                                        data_source.append({'primaryTitle': t, 'averageRating': r})
+                                    data_source = [{'primaryTitle': t, 'averageRating': r} for t, r in top_raw]
 
-                                # --- UI 渲染逻辑 ---
-
-                                # 如果是个性化推荐 (Spark 或 CF)，显示紫色小标签
-                                if is_personalized and data_source:
+                                if is_personalized:
                                     ui.label('✨ 根据您的口味生成').classes('text-xs text-purple-500 q-mb-xs')
-
-                                # 如果是热门推荐，可以显示另一个提示 (可选)
-                                elif not is_personalized and data_source:
-                                    ui.label('🔥 大家都爱看 (数据不足时的默认推荐)').classes(
-                                        'text-xs text-orange-400 q-mb-xs')
+                                else:
+                                    ui.label('🔥 热门榜单 (暂无个性化数据)').classes('text-xs text-orange-400 q-mb-xs')
 
                                 if data_source:
                                     with ui.column().classes('w-full gap-3'):
                                         for idx, m in enumerate(data_source):
-                                            # ... (获取 title 和 rating 的逻辑保持不变) ...
                                             title = m.primaryTitle if hasattr(m, 'primaryTitle') else m['primaryTitle']
-                                            rating = m.averageRating if hasattr(m, 'averageRating') else m['averageRating']
-
-                                            # 【外层容器】使用 items-start 让所有内容顶部对齐
+                                            rating = m.averageRating if hasattr(m, 'averageRating') else m[
+                                                'averageRating']
                                             with ui.row().classes('w-full items-start justify-between group'):
-                                                # 【左侧容器：数字+标题】
-                                                # 1. flex-nowrap: 强制不换行，保证数字和标题在同一水平线
-                                                # 2. items-start: 数字对齐第一行文字的顶部
                                                 with ui.row().classes('gap-2 flex-1 flex-nowrap items-start'):
                                                     color_cls = 'text-orange-500' if idx < 3 else 'text-slate-400'
-
-                                                    # 【数字】增加 flex-shrink-0 防止被长标题挤扁
                                                     ui.label(str(idx + 1)).classes(
                                                         f'font-bold text-sm {color_cls} w-4 flex-shrink-0 leading-tight')
-
-                                                    # 【标题】
-                                                    # 1. flex-1: 占据剩余空间
-                                                    # 2. break-words: 允许长单词换行
-                                                    # 3. leading-tight: 行间距紧凑一点
                                                     ui.label(title).classes(
                                                         'text-sm text-slate-600 group-hover:text-primary transition-colors leading-tight flex-1 break-words')
-
-                                                # 【右侧：评分】
                                                 ui.label(str(rating)).classes(
                                                     'text-xs font-bold text-orange-400 q-ml-sm')
                                 else:
-                                    ui.label('暂无推荐数据').classes('text-sm text-slate-400')
+                                    ui.label('暂无数据').classes('text-sm text-slate-400')
 
-                            # 模块：快捷入口
+                            # 4. 快捷通道
                             with ui.card().classes('w-full p-5 gap-3 shadow-sm bg-blue-50 border border-blue-100'):
                                 ui.label('🚀 快速通道').classes('font-bold text-slate-800')
-
-                                # 2. 快捷入口：我的收藏 (带高亮交互)
                                 with ui.row().classes('items-center gap-2'):
                                     ui.icon('favorite', size='xs', color='red')
                                     ui.link('我的收藏列表', '/user/favorites').classes(
-                                        'text-sm text-slate-700 font-medium cursor-pointer hover:text-rose-600 hover:underline')
-
-                                # 3. 快捷入口：我的评分
+                                        'text-sm text-slate-700 hover:text-rose-600')
                                 with ui.row().classes('items-center gap-2'):
                                     ui.icon('star', size='xs', color='orange')
                                     ui.link('我的评分管理', '/user/ratings').classes(
-                                        'text-sm text-slate-700 font-medium cursor-pointer hover:text-orange-600 hover:underline')
+                                        'text-sm text-slate-700 hover:text-orange-600')
 
-
-
-
-                # --- D. 页脚 ---
+                # 4. 页脚
                 ui.separator().classes('mt-10')
                 with ui.column().classes('w-full items-center py-6 text-slate-400 gap-1'):
                     ui.label('© 2026 MovieRec Graduation Project').classes('text-sm')
+
+    # --- 切换分类函数 ---
+    async def switch_category(val):
+        current_category['value'] = val
+        # 切换分类时清空搜索框
+        search_input.value = ''
+        # 重新加载数据 (必须 await，否则会报错 coroutine never awaited)
+        await load_movies()
 
     # 初始加载
     ui.timer(0, load_movies, once=True)

@@ -104,6 +104,7 @@ class MovieSummary(Base):
     __tablename__ = "movie_summary"
 
     tconst = Column(String, primary_key=True, index=True)
+    titleType = Column(String, index=True)
     primaryTitle = Column(String)
     startYear = Column(Integer)
     runtimeMinutes = Column(Integer)
