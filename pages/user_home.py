@@ -1,6 +1,7 @@
 from nicegui import ui, app
 from services import movie_service, analysis_service, interaction_service, recommendation_service
 import random
+import math
 
 # 卡片背景色池
 BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
@@ -59,6 +60,12 @@ def create_user_home():
     # [新增] 当前选中的分类 (默认全部)
     current_category = {'value': 'all'}
 
+    pagination = {
+        'page': 1,
+        'page_size': 24,
+        'total_pages': 1
+    }
+
     # --- 顶部导航栏 ---
     with ui.header().classes('bg-white text-slate-900 shadow-sm border-b items-center h-16 px-6'):
         with ui.row().classes('items-center gap-2 cursor-pointer'):
@@ -98,6 +105,23 @@ def create_user_home():
         btn = e.sender
         btn.props('icon=favorite color=red' if is_added else 'icon=favorite_border color=white')
 
+    async def change_page(delta):
+        """
+        翻页处理
+        """
+        new_page = pagination['page'] + delta
+        if new_page < 1 or new_page > pagination['total_pages']:
+            return
+
+        # 【修改点】先执行滚动，再加载数据
+        # 这样做的时候，按钮还存在，上下文是安全的
+        ui.run_javascript('window.scrollTo(0, 0)')
+
+        pagination['page'] = new_page
+
+        # 加载数据 (这一步会执行 content_div.clear() 删除旧按钮)
+        await load_movies(query=search_input.value)
+
     def open_rate_dialog(tconst, title, current_score=0):
         if not is_login:
             ui.notify('请先登录', type='warning')
@@ -128,6 +152,17 @@ def create_user_home():
             my_favs = await interaction_service.get_user_favorite_ids(user_id)
             my_ratings = await interaction_service.get_user_ratings_map(user_id)
 
+        total_count = await movie_service.get_homepage_movie_count(
+            search_query=query,
+            category=current_category['value']
+        )
+
+        pagination['total_pages'] = math.ceil(total_count / pagination['page_size']) if total_count > 0 else 1
+
+        # 修正当前页码 (防止搜索后页码超出范围)
+        if pagination['page'] > pagination['total_pages']:
+            pagination['page'] = 1
+
         with content_div:
             with ui.column().classes('w-full max-w-[1400px] p-6 gap-6'):
 
@@ -143,7 +178,7 @@ def create_user_home():
                                 'text-slate-200 text-lg font-medium')
                             with ui.row().classes('items-center gap-2 text-slate-400 text-sm'):
                                 ui.icon('hub', size='xs')
-                                ui.label('不仅是精准推荐，更是连接您与电影世界的智慧桥梁。')
+                                ui.label('不仅是精准推荐，更是连接您与影视世界的智慧桥梁。')
 
                 # 2. [新增] 分类导航栏 (无搜索时显示)
                 if not query:
@@ -176,8 +211,8 @@ def create_user_home():
 
                         # 调用 Service (传入 category)
                         movies = await movie_service.get_homepage_movies(
-                            page=1,
-                            page_size=24,
+                            page=pagination['page'],  # <--- 使用状态里的 page
+                            page_size=pagination['page_size'],
                             search_query=query,
                             category=current_category['value']
                         )
@@ -236,6 +271,21 @@ def create_user_home():
                                                 else:
                                                     ui.label(f'{m.runtimeMinutes or "?"} min').classes(
                                                         'text-xs text-slate-400')
+
+                            with ui.row().classes('w-full justify-center items-center mt-10 gap-4'):
+                                # 上一页按钮
+                                ui.button('上一页', on_click=lambda: change_page(-1)) \
+                                    .props('flat color=grey-7 icon=chevron_left') \
+                                    .bind_visibility_from(pagination, 'page', backward=lambda p: p > 1)
+
+                                # 页码显示 (直接使用 f-string 显示，不需要 bind)
+                                ui.label(f"第 {pagination['page']} 页 / 共 {pagination['total_pages']} 页") \
+                                    .classes('text-slate-600 font-medium bg-slate-100 px-4 py-1 rounded-full text-sm')
+
+                                # 下一页按钮
+                                ui.button('下一页', on_click=lambda: change_page(1)) \
+                                    .props('flat color=primary icon-right=chevron_right') \
+                                    .bind_visibility_from(pagination, 'page', backward=lambda p: p < pagination['total_pages'])
 
                     # === 右侧：侧边栏 ===
                     if is_login and not query:
@@ -342,6 +392,7 @@ def create_user_home():
         # 切换分类时清空搜索框
         search_input.value = ''
         # 重新加载数据 (必须 await，否则会报错 coroutine never awaited)
+        pagination['page'] = 1
         await load_movies()
 
     # 初始加载

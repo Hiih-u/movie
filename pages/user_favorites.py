@@ -2,6 +2,7 @@
 from nicegui import ui, app
 from services import interaction_service
 from pages import user_layout  # 引入布局
+import math
 
 BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
 
@@ -12,12 +13,26 @@ def create_page():
 
     # 2. 页面主体内容
     user_id = app.storage.user.get('user_id')
-    page_state = {'current_page': 1, 'page_size': 12}
+    page_state = {
+        'current_page': 1,
+        'page_size': 12,
+        'total_pages': 1  # <--- 新增状态
+    }
 
     content_div = ui.column().classes('w-full p-6 items-center')
 
     async def load_data():
         content_div.clear()
+
+        # --- 2. 获取总数并计算页数 ---
+        total_count = await interaction_service.get_my_favorites_count(user_id)
+        total_pages = math.ceil(total_count / page_state['page_size']) if total_count > 0 else 1
+        page_state['total_pages'] = total_pages
+
+        # --- 3. 【核心】防止页码越界逻辑 ---
+        if page_state['current_page'] > total_pages:
+            page_state['current_page'] = 1
+
         movies = await interaction_service.get_my_favorites_paginated(
             user_id, page_state['current_page'], page_state['page_size']
         )
@@ -50,14 +65,23 @@ def create_page():
                                 'text-xs font-bold text-orange-500 self-end')
 
             # 简易翻页
-            with ui.row().classes('mt-4'):
-                ui.button('上一页', on_click=lambda: change_page(-1)).props('flat dense')
-                ui.label(f"Page {page_state['current_page']}").classes('mx-2 self-center')
-                ui.button('下一页', on_click=lambda: change_page(1)).props('flat dense')
+            with ui.row().classes('mt-8 justify-center items-center gap-4'):
+                ui.button('上一页', on_click=lambda: change_page(-1)) \
+                    .props('flat dense icon=chevron_left') \
+                    .bind_visibility_from(page_state, 'current_page', backward=lambda p: p > 1)
+
+                ui.label(f"第 {page_state['current_page']} 页 / 共 {total_pages} 页") \
+                    .classes('text-slate-500 font-medium')
+
+                ui.button('下一页', on_click=lambda: change_page(1)) \
+                    .props('flat dense icon-right=chevron_right') \
+                    .bind_visibility_from(page_state, 'current_page', backward=lambda p: p < total_pages)
 
     async def change_page(delta):
-        if page_state['current_page'] + delta < 1: return
-        page_state['current_page'] += delta
+        new_page = page_state['current_page'] + delta
+        if new_page < 1 or new_page > page_state['total_pages']:
+            return
+        page_state['current_page'] = new_page
         await load_data()
 
     async def remove_fav(tconst):

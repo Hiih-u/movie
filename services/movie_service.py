@@ -196,3 +196,42 @@ async def get_homepage_movies(page: int, page_size: int, search_query=None, cate
         result = await db.execute(query)
 
         return result.scalars().all()
+
+
+async def get_homepage_movie_count(search_query=None, category='all'):
+    """
+    获取符合筛选条件的电影总数，用于计算分页
+    逻辑必须与 get_homepage_movies 保持完全一致
+    """
+    async with AsyncSessionLocal() as db:
+        query = select(func.count(MovieSummary.tconst))
+
+        # --- 1. 处理搜索 ---
+        if search_query:
+            query = query.where(MovieSummary.primaryTitle.ilike(f"%{search_query}%"))
+
+        # --- 2. 处理分类导航 (复制 get_homepage_movies 的逻辑) ---
+        if category == 'movie':
+            query = query.where(MovieSummary.titleType.in_(['movie', 'tvMovie']))
+            query = query.where(MovieSummary.genres.notilike('%Animation%'))
+            query = query.where(MovieSummary.genres.notilike('%Documentary%'))
+
+        elif category == 'tv':
+            query = query.where(MovieSummary.titleType.in_(['tvSeries', 'tvMiniSeries']))
+            query = query.where(MovieSummary.genres.notilike('%Animation%'))
+
+        elif category == 'anime':
+            query = query.where(MovieSummary.genres.ilike('%Animation%'))
+
+        elif category == 'variety':
+            query = query.where(or_(
+                MovieSummary.genres.ilike('%Reality-TV%'),
+                MovieSummary.genres.ilike('%Talk-Show%'),
+                MovieSummary.genres.ilike('%Game-Show%')
+            ))
+
+        elif category == 'doc':
+            query = query.where(MovieSummary.genres.ilike('%Documentary%'))
+
+        result = await db.execute(query)
+        return result.scalar()

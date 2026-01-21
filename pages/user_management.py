@@ -16,7 +16,8 @@ def create_user_page():
     # 分页状态：默认第1页，每页20条
     page_state = {
         'current_page': 1,
-        'page_size': 20
+        'page_size': 20,
+        'total_pages': 1  # 【新增】增加 total_pages 状态，方便按钮做边界判断
     }
 
     # --- 2. 侧边栏 (保持原样) ---
@@ -99,17 +100,18 @@ def create_user_page():
             # (3) 底部翻页控制条
             with ui.row().classes('w-full justify-center items-center q-pa-sm gap-4 bg-gray-50 border-t'):
                 # 翻页函数
-                def change_page(delta):
+                async def change_page(delta):
                     new_page = page_state['current_page'] + delta
-                    if new_page < 1:
+                    # 增加上限检查，防止翻到不存在的页
+                    if new_page < 1 or new_page > page_state['total_pages']:
                         return
-                    page_state['current_page'] = new_page
-                    load_users()
 
-                btn_prev = ui.button('上一页', on_click=lambda: change_page(-1)).props('flat dense icon=chevron_left')
+                    page_state['current_page'] = new_page
+                    await load_users()  # 【关键修正】加上 await
+
+                ui.button('上一页', on_click=lambda: change_page(-1)).props('flat dense icon=chevron_left')
                 pagination_label = ui.label('正在加载...').classes('text-gray-700 font-medium')
-                btn_next = ui.button('下一页', on_click=lambda: change_page(1)).props(
-                    'flat dense icon-right=chevron_right')
+                ui.button('下一页', on_click=lambda: change_page(1)).props('flat dense icon-right=chevron_right')
 
     # --- 4. 逻辑处理函数 ---
 
@@ -128,6 +130,8 @@ def create_user_page():
 
             # 计算总页数 (防止 total_count=0 时报错)
             total_pages = math.ceil(total_count / page_state['page_size']) if total_count > 0 else 1
+
+            page_state['total_pages'] = total_pages
 
             # 搜索时，如果当前页码超过了新的总页数，重置为第1页
             if page_state['current_page'] > total_pages:

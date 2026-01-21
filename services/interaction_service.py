@@ -1,7 +1,20 @@
-from sqlalchemy import select, delete, and_, desc
+from sqlalchemy import select, delete, and_, desc, func
 from database import AsyncSessionLocal
 from models import UserFavorite, MovieSummary, UserRating
 
+
+
+async def get_my_favorites_count(user_id: int):
+    async with AsyncSessionLocal() as db:
+        stmt = select(func.count(UserFavorite.id)).where(UserFavorite.user_id == user_id)
+        result = await db.execute(stmt)
+        return result.scalar()
+
+async def get_my_ratings_count(user_id: int):
+    async with AsyncSessionLocal() as db:
+        stmt = select(func.count(UserRating.id)).where(UserRating.user_id == user_id)
+        result = await db.execute(stmt)
+        return result.scalar()
 
 # --- 增/删 (Toggle) ---
 async def toggle_favorite(user_id: int, tconst: str):
