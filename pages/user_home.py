@@ -159,6 +159,8 @@ def create_user_home():
 
         pagination['total_pages'] = math.ceil(total_count / pagination['page_size']) if total_count > 0 else 1
 
+        cat_val = current_category['value']
+
         # 修正当前页码 (防止搜索后页码超出范围)
         if pagination['page'] > pagination['total_pages']:
             pagination['page'] = 1
@@ -333,19 +335,42 @@ def create_user_home():
                             with ui.card().classes('w-full p-5 gap-4 shadow-sm bg-white'):
                                 with ui.row().classes('items-center gap-2'):
                                     ui.icon('recommend', color='orange').classes('text-xl')
-                                    ui.label('猜你喜欢').classes('font-bold text-lg text-slate-800')
+                                    # 动态标题：让用户知道推荐变了
+                                    rec_title = '猜你喜欢'
+                                    if cat_val == 'variety':
+                                        rec_title = '为您推荐的综艺'
+                                    elif cat_val == 'anime':
+                                        rec_title = '为您推荐的动漫'
+                                    elif cat_val == 'movie':
+                                        rec_title = '为您推荐的电影'
+
+                                    ui.label(rec_title).classes('font-bold text-lg text-slate-800')
+
                                 ui.separator()
 
                                 # 推荐策略：Spark -> 实时CF -> 热门
-                                data_source = await recommendation_service.get_spark_recommendations(user_id, limit=8)
+                                data_source = await recommendation_service.get_spark_recommendations(
+                                    user_id, limit=8, category=cat_val
+                                )
                                 is_personalized = True
+
+                                # 2. 实时协同过滤 (带过滤)
                                 if not data_source:
-                                    data_source = await recommendation_service.get_recommendations(user_id, limit=8)
+                                    data_source = await recommendation_service.get_recommendations(
+                                        user_id, limit=8, category=cat_val
+                                    )
+
+                                # 3. 兜底策略：如果个性化推荐在这个分类下没结果，就取该分类的“热门榜单”
                                 if not data_source:
                                     is_personalized = False
-                                    top_raw = await analysis_service.get_top_movies(limit=8)
-                                    data_source = [{'primaryTitle': t, 'averageRating': r} for t, r in top_raw]
+                                    # 我们需要 modify analysis_service 来支持 category，或者直接调用 movie_service 获取热门
+                                    # 最简单的方法：复用 movie_service.get_homepage_movies (它本身就是按热度排序的)
+                                    top_raw = await movie_service.get_homepage_movies(
+                                        page=1, page_size=8, category=cat_val
+                                    )
+                                    data_source = top_raw  # movie_service 返回的就是 MovieSummary 对象列表
 
+                                # --- UI 渲染逻辑 ---
                                 if is_personalized:
                                     ui.label('✨ 根据您的口味生成').classes('text-xs text-purple-500 q-mb-xs')
                                 else:

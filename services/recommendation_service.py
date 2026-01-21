@@ -2,8 +2,10 @@
 import pandas as pd
 import pickle
 import os
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_
 from sklearn.metrics.pairwise import cosine_similarity
+from unicodedata import category
+
 from database import AsyncSessionLocal
 from models import UserRating, MovieSummary, UserFavorite
 from models import SparkRecommendation
@@ -111,8 +113,32 @@ def load_model():
         return False
 
 
+def _apply_category_filter(query, category):
+    """
+    根据分类为 SQL 查询添加过滤条件
+    """
+    if category == 'movie':
+        # 电影：过滤掉纪录片和动画(如果想分得细的话)，保留 Movie 和 TV Movie
+        query = query.where(MovieSummary.titleType.in_(['movie', 'tvMovie']))
+        query = query.where(MovieSummary.genres.notilike('%Documentary%'))
+    elif category == 'tv':
+        query = query.where(MovieSummary.titleType.in_(['tvSeries', 'tvMiniSeries']))
+    elif category == 'anime':
+        query = query.where(MovieSummary.genres.ilike('%Animation%'))
+    elif category == 'variety':
+        query = query.where(or_(
+            MovieSummary.genres.ilike('%Reality-TV%'),
+            MovieSummary.genres.ilike('%Talk-Show%'),
+            MovieSummary.genres.ilike('%Game-Show%')
+        ))
+    elif category == 'doc':
+        query = query.where(MovieSummary.genres.ilike('%Documentary%'))
+
+    return query
+
+
 # --- 3. 获取推荐结果 (前台调用) ---
-async def get_recommendations(user_id: int, limit=8):
+async def get_recommendations(user_id: int, limit=8,category='all'):
     """
     核心推荐逻辑
     """
@@ -175,12 +201,16 @@ async def get_recommendations(user_id: int, limit=8):
         return []
 
     # 按分数倒序排列
-    sorted_candidates = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+    sorted_candidates = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)[:100]
     top_ids = [x[0] for x in sorted_candidates]
 
     # 5. 查数据库获取电影详情返回
     async with AsyncSessionLocal() as db:
-        res = await db.execute(select(MovieSummary).where(MovieSummary.tconst.in_(top_ids)))
+        query = select(MovieSummary).where(MovieSummary.tconst.in_(top_ids))
+        if category != 'all':
+            query = _apply_category_filter(query, category)
+
+        res = await db.execute(query)
         movies = res.scalars().all()
 
         # 按推荐顺序重新排列 (SQL IN 查询不保证顺序)
@@ -189,21 +219,20 @@ async def get_recommendations(user_id: int, limit=8):
         for mid in top_ids:
             if mid in movies_map:
                 ordered_movies.append(movies_map[mid])
+                if len(ordered_movies) >= limit:
+                    break
 
         return ordered_movies
 
 
-async def get_spark_recommendations(user_id: int, limit=8):
-    """
-    获取 Spark 离线计算的推荐结果
-    """
+async def get_spark_recommendations(user_id: int, limit=8, category='all'):
     async with AsyncSessionLocal() as db:
-        # 1. 直接查表
+        # 1. 查推荐表 (扩大范围取 100 个，防止过滤后不够)
         stmt = (
             select(SparkRecommendation.tconst)
             .where(SparkRecommendation.user_id == user_id)
             .order_by(desc(SparkRecommendation.score))
-            .limit(limit)
+            .limit(100)
         )
         res = await db.execute(stmt)
         tconsts = res.scalars().all()
@@ -211,11 +240,23 @@ async def get_spark_recommendations(user_id: int, limit=8):
         if not tconsts:
             return []
 
-        # 2. 查电影详情
-        movies_stmt = select(MovieSummary).where(MovieSummary.tconst.in_(tconsts))
-        movies_res = await db.execute(movies_stmt)
+        # 2. 查详情并过滤
+        query = select(MovieSummary).where(MovieSummary.tconst.in_(tconsts))
+
+        # 【应用过滤】
+        if category != 'all':
+            query = _apply_category_filter(query, category)
+
+        movies_res = await db.execute(query)
         movies = movies_res.scalars().all()
 
-        # 按推荐顺序排序
+        # 3. 按推荐分排序并截取
         movies_map = {m.tconst: m for m in movies}
-        return [movies_map[tid] for tid in tconsts if tid in movies_map]
+        final_list = []
+        for tid in tconsts:
+            if tid in movies_map:
+                final_list.append(movies_map[tid])
+                if len(final_list) >= limit:
+                    break
+
+        return final_list
