@@ -18,35 +18,61 @@ NAV_ITEMS = [
 
 
 # --- 情感推荐弹窗逻辑 ---
-async def open_mood_dialog(mood):
-    ui.notify(f'正在为您寻找适合 "{mood}" 的电影...', type='info')
-    movies = await analysis_service.get_movies_by_mood(mood)
+async def open_mood_dialog(mood, category='all'):
+    ui.notify(f'正在感知您的情绪: "{mood}" ...', type='info')
+
+    # 【核心修改】解包返回结果：电影列表 + 暖心文案
+    # 注意：analysis_service.MOOD_SCENARIOS 需要在文件头部确保能访问到 keys 用于 Chip 渲染
+    # 但这里我们是直接调用函数，只需要改接收部分
+
+    # 调用后端 (返回的是 tuple: (list, str))
+    movies, warm_msg = await analysis_service.get_movies_by_mood(mood, category=category)
 
     with ui.dialog() as dialog, ui.card().classes('w-[600px] h-[80vh] p-0 flex flex-col'):
-        with ui.row().classes('w-full p-4 bg-purple-600 text-white items-center justify-between'):
-            ui.label(f'🎬 {mood} 专属片单').classes('text-lg font-bold')
-            ui.button(icon='close', on_click=dialog.close).props('flat round dense text-color=white')
+        # 1. 头部：使用更柔和的渐变色
+        with ui.column().classes('w-full p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white gap-2 relative'):
+            # 关闭按钮
+            ui.button(icon='close', on_click=dialog.close) \
+                .props('flat round dense text-color=white') \
+                .classes('absolute top-2 right-2')
 
-        with ui.scroll_area().classes('flex-1 p-4'):
+            # 标题
+            with ui.row().classes('items-center gap-2'):
+                ui.label(f'{mood} 专属片单').classes('text-2xl font-bold')
+
+            # 【新增】展示暖心文案
+            # 使用 italic 字体增加情感度
+            ui.label(warm_msg).classes('text-sm text-purple-100 italic font-medium leading-relaxed')
+
+        # 2. 内容区
+        with ui.scroll_area().classes('flex-1 p-4 bg-slate-50'):
             if not movies:
-                ui.label('哎呀，没找到相关推荐...').classes('text-grey')
+                with ui.column().classes('w-full items-center py-10 gap-2'):
+                    ui.icon('sentiment_dissatisfied', size='xl', color='grey')
+                    ui.label('暂未找到匹配的影片，不过没关系，休息一下也是很好的选择。').classes('text-slate-400')
             else:
-                with ui.column().classes('w-full gap-4'):
+                with ui.column().classes('w-full gap-3'):
                     for m in movies:
+                        # 卡片样式优化
                         with ui.card().classes(
-                                'w-full p-3 shadow-sm border border-gray-100 hover:shadow-md transition-shadow'):
+                                'w-full p-3 shadow-sm border border-purple-50 hover:shadow-md transition-all'):
                             with ui.row().classes('w-full justify-between items-start no-wrap'):
-                                with ui.column().classes('gap-1'):
-                                    ui.label(m['primaryTitle']).classes('font-bold text-md leading-tight')
+                                with ui.column().classes('gap-1 flex-1'):
+                                    ui.label(m['primaryTitle']).classes(
+                                        'font-bold text-md leading-tight text-slate-800')
                                     with ui.row().classes('items-center gap-2'):
                                         ui.label(str(m['startYear'])).classes(
-                                            'text-xs text-gray-400 bg-gray-100 px-1 rounded')
-                                        ui.label(m['genres']).classes('text-xs text-purple-400')
+                                            'text-xs text-slate-500 bg-slate-100 px-1.5 rounded')
+                                        # 简单截取 genres
+                                        ui.label(m['genres'].replace(',', ' / ')).classes('text-xs text-purple-500')
+
                                 with ui.column().classes('items-end'):
                                     ui.label(f"★ {m['averageRating']}").classes('font-bold text-orange-500 text-lg')
 
-        with ui.row().classes('w-full p-3 border-t justify-end bg-gray-50'):
-            ui.button('关闭', on_click=dialog.close).props('unelevated color=purple')
+        # 3. 底部
+        with ui.row().classes('w-full p-3 border-t justify-end bg-white'):
+            ui.button('关闭', on_click=dialog.close).props('unelevated color=indigo-600')
+
     dialog.open()
 
 
@@ -311,7 +337,7 @@ def create_user_home():
                                     if detected_mood:
                                         ui.notify(f'感知到您可能觉得 "{detected_mood}"', type='positive',
                                                   icon='auto_awesome')
-                                        await open_mood_dialog(detected_mood)
+                                        await open_mood_dialog(detected_mood, category=current_category['value'])
                                     else:
                                         ui.notify('抱歉，没读懂您的情绪，请试着换个说法', type='info')
 
@@ -325,11 +351,14 @@ def create_user_home():
                                     ui.label('🎭 此刻心情').classes('font-bold text-lg text-purple-900')
                                     ui.badge('New', color='purple').props('text-color=white dense')
                                 with ui.row().classes('gap-2'):
-                                    for m in analysis_service.MOOD_MAP.keys():
-                                        ui.chip(m, on_click=lambda e, mood=m: open_mood_dialog(mood)) \
+                                    moods = analysis_service.MOOD_SCENARIOS.keys()
+                                    for m in moods:
+                                        # 点击标签触发函数 (记得传 category)
+                                        ui.chip(m, on_click=lambda e, mood=m: open_mood_dialog(mood, category=
+                                        current_category['value'])) \
                                             .props(
-                                            'clickable color=white text-color=purple-800 icon-right=chevron_right').classes(
-                                            'shadow-sm')
+                                            'clickable color=white text-color=purple-800 icon-right=chevron_right') \
+                                            .classes('shadow-sm hover:bg-purple-100 transition-colors')
 
                             # 3. 猜你喜欢 (推荐系统)
                             with ui.card().classes('w-full p-5 gap-4 shadow-sm bg-white'):
