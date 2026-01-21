@@ -16,7 +16,7 @@ NAV_ITEMS = [
 ]
 
 
-# --- 情感推荐弹窗逻辑 (保持不变) ---
+# --- 情感推荐弹窗逻辑 ---
 async def open_mood_dialog(mood):
     ui.notify(f'正在为您寻找适合 "{mood}" 的电影...', type='info')
     movies = await analysis_service.get_movies_by_mood(mood)
