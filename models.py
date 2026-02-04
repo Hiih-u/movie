@@ -150,3 +150,21 @@ class SparkRecommendation(Base):
     tconst = Column(String, index=True)    # 推荐了哪部电影
     score = Column(Float)                  # 推荐分数 (预测评分)
     algorithm = Column(String, default="ALS") # 算法名称，方便以后对比
+
+
+class DoubanTop250(Base):
+    """
+    存储豆瓣 Top 250 榜单数据
+    """
+    __tablename__ = "douban_top250"
+
+    id = Column(Integer, primary_key=True, index=True)
+    rank = Column(Integer, index=True)  # 排名 (1-250)
+    title = Column(String)  # 中文电影名
+    douban_id = Column(String, unique=True, index=True)  # 豆瓣 ID (如 1292052)
+    imdb_id = Column(String, index=True)  # IMDb ID (如 tt0111161)
+
+    # 可选：顺便把评分也存了，方便后续做对比分析
+    douban_score = Column(Float)
+
+    created_at = Column(DateTime, default=datetime.now)
