@@ -3,10 +3,11 @@ import os
 from datetime import datetime
 from sqlalchemy import select, func, desc, or_
 from database import AsyncSessionLocal
-from models import TitleBasics, TitleRatings
+from models import TitleBasics, TitleRatings, DoubanTop250
 from transformers import pipeline
 import functools
 import random
+import pandas as pd
 
 # === 【核心修改】升级为更具人文关怀的情绪场景配置 ===
 MOOD_SCENARIOS = {
@@ -202,3 +203,154 @@ async def get_stats_summary():
         movie_count = await db.execute(select(func.count(TitleBasics.tconst)))
         avg_rating = await db.execute(select(func.avg(TitleRatings.averageRating)))
         return movie_count.scalar(), round(avg_rating.scalar() or 0, 2)
+
+
+async def get_genre_distribution(limit=5000):
+    """1. 题材偏好 (玫瑰图数据)"""
+    async with AsyncSessionLocal() as db:
+        # 取最热门的 N 部电影的类型
+        stmt = (
+            select(TitleBasics.genres)
+            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst)
+            .order_by(desc(TitleRatings.numVotes))
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        genres_list = []
+        for row in res.scalars().all():
+            if row and row != '\\N':
+                # 'Action,Adventure' -> ['Action', 'Adventure']
+                genres_list.extend(row.split(','))
+
+        # 统计频次
+        if not genres_list: return []
+        df = pd.DataFrame(genres_list, columns=['genre'])
+        # 过滤掉无效数据
+        df = df[df['genre'] != '\\N']
+        counts = df['genre'].value_counts().reset_index()
+        counts.columns = ['genre', 'count']
+        return counts.head(15).to_dict('records')  # 取前15个主流类型
+
+
+async def get_rating_distribution_by_genre(limit=5000):
+    """2. 评分深度分析 (箱线图/小提琴图数据)"""
+    async with AsyncSessionLocal() as db:
+        # 获取 热门电影的 类型 和 评分
+        stmt = (
+            select(TitleBasics.genres, TitleRatings.averageRating)
+            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst)
+            .order_by(desc(TitleRatings.numVotes))
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        data = []
+        for genres, rating in res.all():
+            if genres and rating:
+                # 一部电影属于多个类型，拆开来算
+                for g in genres.split(','):
+                    if g != '\\N':
+                        data.append({'genre': g, 'rating': rating})
+
+        df = pd.DataFrame(data)
+        # 只要前 10 大类型，防止图表太挤
+        top_genres = df['genre'].value_counts().head(10).index
+        df_filtered = df[df['genre'].isin(top_genres)]
+        return df_filtered.to_dict('records')
+
+
+async def get_genre_evolution(limit=10000):
+    """3. 时空演变 (热力图数据: 年代 vs 类型)"""
+    async with AsyncSessionLocal() as db:
+        # 取 1980 年以后的数据
+        stmt = (
+            select(TitleBasics.startYear, TitleBasics.genres)
+            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst)
+            .where(TitleBasics.startYear >= 1980)
+            .order_by(desc(TitleRatings.numVotes))
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        data = []
+        for year, genres in res.all():
+            if year and genres:
+                for g in genres.split(','):
+                    if g != '\\N':
+                        # 将年份归类为年代 (1993 -> 1990s)
+                        decade = (year // 10) * 10
+                        data.append({'decade': decade, 'genre': g})
+
+        if not data: return [], [], []
+
+        df = pd.DataFrame(data)
+        # 聚合计数
+        pivot = df.groupby(['decade', 'genre']).size().reset_index(name='count')
+
+        # 筛选主要类型
+        top_genres = pivot.groupby('genre')['count'].sum().nlargest(10).index
+        pivot = pivot[pivot['genre'].isin(top_genres)]
+
+        # 格式化为 Plotly Heatmap 需要的格式
+        # x: decades, y: genres, z: counts matrix
+        years = sorted(pivot['decade'].unique())
+        genres = sorted(pivot['genre'].unique())
+
+        # 构建矩阵
+        z = [[0] * len(years) for _ in range(len(genres))]
+        for _, row in pivot.iterrows():
+            y_idx = genres.index(row['genre'])
+            x_idx = years.index(row['decade'])
+            z[y_idx][x_idx] = row['count']
+
+        return years, genres, z
+
+
+async def get_scatter_data(limit=2000):
+    """4. 质量与热度 (散点图数据)"""
+    async with AsyncSessionLocal() as db:
+        stmt = (
+            select(TitleBasics.primaryTitle, TitleRatings.averageRating, TitleRatings.numVotes, TitleBasics.genres)
+            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst)
+            .order_by(desc(TitleRatings.numVotes))
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        data = []
+        for row in res.all():
+            data.append({
+                'title': row.primaryTitle,
+                'rating': row.averageRating,
+                'votes': row.numVotes,
+                'genre': row.genres.split(',')[0] if row.genres else 'Unknown'  # 取主类型用于着色
+            })
+        return data
+
+
+async def get_cultural_comparison():
+    """5. 中西审美差异 (双向柱状图)"""
+    async with AsyncSessionLocal() as db:
+        # 连接 DoubanTop250 和 TitleRatings
+        # 注意：这需要 DoubanTop250 表里的 imdb_id 字段有值
+        # 如果你的 crawler 还没填 imdb_id，这里会查不到数据
+        stmt = (
+            select(DoubanTop250.title, DoubanTop250.douban_score, TitleRatings.averageRating)
+            .join(TitleRatings, DoubanTop250.imdb_id == TitleRatings.tconst)
+            .order_by(DoubanTop250.rank)
+            .limit(20)  # 取前20名对比，避免图表太长
+        )
+        res = await db.execute(stmt)
+        data = res.all()
+
+        # 如果通过 ID 关联不到，尝试通过标题关联 (兜底策略)
+        if not data:
+            print("⚠️ 无法通过 ID 关联豆瓣与IMDb，尝试通过标题关联...")
+            stmt = (
+                select(DoubanTop250.title, DoubanTop250.douban_score, TitleRatings.averageRating)
+                .join(TitleBasics, DoubanTop250.title == TitleBasics.primaryTitle)  # 标题匹配
+                .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst)
+                .order_by(DoubanTop250.rank)
+                .limit(20)
+            )
+            res = await db.execute(stmt)
+            data = res.all()
+
+        return [{'title': r[0], 'douban': r[1], 'imdb': r[2]} for r in data]
