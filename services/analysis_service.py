@@ -167,7 +167,6 @@ async def get_movies_by_mood(mood_key: str, limit=12, category='all'):
         return all_movies[:limit], warm_msg
 
 
-# ... (get_top_movies, get_year_stats, get_stats_summary 保持不变) ...
 async def get_top_movies(limit=10):
     async with AsyncSessionLocal() as db:
         query = (

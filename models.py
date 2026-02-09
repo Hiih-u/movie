@@ -164,7 +164,6 @@ class DoubanTop250(Base):
     douban_id = Column(String, unique=True, index=True)  # 豆瓣 ID (如 1292052)
     imdb_id = Column(String, index=True)  # IMDb ID (如 tt0111161)
 
-    # 可选：顺便把评分也存了，方便后续做对比分析
     douban_score = Column(Float)
 
     created_at = Column(DateTime, default=datetime.now)
