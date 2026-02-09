@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from sqlalchemy import select, func, desc, or_
 from database import AsyncSessionLocal
-from models import TitleBasics, TitleRatings, DoubanTop250
+from models import TitleBasics, TitleRatings, DoubanTop250, MovieBoxOffice
 from transformers import pipeline
 import functools
 import random
@@ -354,3 +354,40 @@ async def get_cultural_comparison():
             data = res.all()
 
         return [{'title': r[0], 'douban': r[1], 'imdb': r[2]} for r in data]
+
+
+async def get_roi_scatter_data(limit=1000):
+    """
+    【新增】获取 商业价值(票房) vs 艺术口碑(评分) 散点图数据
+    用于生成 ROI Bubble Chart
+    """
+    async with AsyncSessionLocal() as db:
+        stmt = (
+            select(
+                TitleBasics.primaryTitle,
+                TitleBasics.genres,
+                TitleRatings.averageRating,
+                TitleRatings.numVotes,
+                MovieBoxOffice.box_office
+            )
+            .join(MovieBoxOffice, TitleBasics.tconst == MovieBoxOffice.tconst)
+            .join(TitleRatings, TitleBasics.tconst == TitleRatings.tconst)
+            .where(MovieBoxOffice.box_office > 0)  # 只取有票房的数据
+            .order_by(desc(MovieBoxOffice.box_office))
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        data = []
+        for row in res.all():
+            title, genres, rating, votes, box_office = row
+            # 处理类型: 'Action,Adventure' -> 取 'Action' 主类型，简化颜色分类
+            main_genre = genres.split(',')[0] if genres and genres != '\\N' else 'Other'
+
+            data.append({
+                'title': title,
+                'genre': main_genre,
+                'rating': rating,
+                'votes': votes,  # 气泡大小 (热度)
+                'box_office': box_office  # X轴 (票房)
+            })
+        return data

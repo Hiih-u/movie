@@ -74,6 +74,15 @@ def create_analytics_page():
                 ui.element('iframe').props(f'src="{src_url}" frameborder="0"') \
                     .classes('w-full flex-1')
 
+        with ui.row().classes('w-full q-mb-lg'):
+            # height='600px' 给足空间
+            chart_card(
+                title='💰 商业价值与艺术口碑关联分析 (ROI Bubble Chart)',
+                filename='roi_bubble.html',
+                height='710px',
+                color='indigo'
+            )
+
         # --- 第一行：题材与评分 (左右布局) ---
         with ui.row().classes('w-full gap-6 q-mb-md'):
             with ui.column().classes('flex-1'):

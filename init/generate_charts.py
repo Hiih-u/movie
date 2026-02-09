@@ -4,6 +4,7 @@ import asyncio
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 
 # --- 1. 路径配置 ---
 # 确保能导入项目根目录的模块
@@ -223,6 +224,70 @@ async def generate_all_charts():
             print("⚠️ 未检测到豆瓣/IMDb关联数据，跳过对比图。")
     except Exception as e:
         print(f"❌ 对比图生成失败: {e}")
+
+
+    # --- 图表 6: 商业价值 vs 口碑 (ROI Bubble Chart) ---
+    print("🎨 正在生成: 商业价值 vs 口碑气泡图 (roi_bubble.html)...")
+    try:
+        roi_data = await analysis_service.get_roi_scatter_data()
+
+        if roi_data:
+            df = pd.DataFrame(roi_data)
+
+            # 使用 Plotly Express 绘制气泡图
+            # log_x=True 是关键，因为票房差距巨大（几百万到几十亿），必须用对数坐标才能看清
+            fig = px.scatter(
+                df,
+                x="box_office",
+                y="rating",
+                size="votes",  # 气泡大小代表热度 (投票数)
+                color="genre",  # 颜色代表类型
+                hover_name="title",  # 鼠标悬停显示电影名
+                log_x=True,  # X轴使用对数坐标
+                size_max=35,  # 气泡最大尺寸限制，防止太挡视线
+                template="plotly_white",
+                color_discrete_sequence=px.colors.qualitative.Bold,  # 鲜艳配色
+                labels={"box_office": "全球票房 (美元)", "rating": "IMDb 评分", "votes": "投票热度"}
+            )
+
+            # --- 深度优化：标注“叫好又叫座”的神作区 ---
+            # 我们定义：票房 > 1亿美元 且 评分 > 8.5 的区域为“神作区”
+
+            # 1. 画一个红色虚线框 (Rectangle)
+            fig.add_shape(type="rect",
+                          x0=100_000_000, y0=8.5,  # 左下角 (1亿, 8.5分)
+                          x1=3_000_000_000, y1=10,  # 右上角 (30亿, 10分)
+                          line=dict(color="Red", width=2, dash="dot"),
+                          fillcolor="rgba(255, 0, 0, 0.05)",  # 极淡的红色背景
+                          )
+
+            # 2. 加文字标注
+            # 注意：在对数坐标轴上，位置需要 careful。Plotly 的 add_annotation 会自动处理 log 坐标
+            fig.add_annotation(
+                x=500_000_000,
+                y=9.6,
+                text="🏆 叫好又叫座 (神作区)",
+                showarrow=False,
+                font=dict(color="red", size=14, weight="bold")
+            )
+
+            # 3. 布局微调
+            fig.update_layout(
+                margin=dict(t=20, b=40, l=60, r=20),
+                legend=dict(
+                    title="电影类型",
+                    orientation="h",  # 图例横排
+                    yanchor="bottom", y=1.02,  # 放在图表上方
+                    xanchor="right", x=1
+                ),
+                height=600  # 高度设高一点，更有气势
+            )
+
+            fig.write_html(os.path.join(STATIC_DIR, "roi_bubble.html"))
+            print("✅ 气泡图生成成功！")
+
+    except Exception as e:
+        print(f"❌ ROI 气泡图生成失败: {e}")
 
     print("🎉 所有任务执行完毕！")
 

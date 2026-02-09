@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime, UniqueConstraint, BigInteger
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -176,3 +176,26 @@ class DoubanTop250(Base):
     douban_score = Column(Float)
 
     created_at = Column(DateTime, default=datetime.now)
+
+
+class MovieBoxOffice(Base):
+    """
+    【新增】专门存储电影票房数据的表
+    独立存储，方便爬虫单独维护
+    """
+    __tablename__ = "movie_box_office"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tconst = Column(String, ForeignKey("title_basics.tconst"), unique=True, index=True)
+
+    # 票房金额 (美元)，使用 BigInteger 防止溢出
+    box_office = Column(BigInteger, nullable=True)
+
+    # 爬取排名 (例如 Top 1000 中的第几名)
+    rank = Column(Integer, nullable=True)
+
+    # 最后更新时间
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 建立关联
+    movie = relationship("TitleBasics", backref="box_office_data")
