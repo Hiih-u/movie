@@ -1,10 +1,21 @@
 from nicegui import ui, app
+
+from pages import movie_detail
 from services import movie_service, analysis_service, interaction_service, recommendation_service
 import random
 import math
 
 # 卡片背景色池
-BG_COLORS = ['bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-cyan-600']
+BG_GRADIENTS = [
+    'bg-gradient-to-br from-blue-500 to-indigo-600',
+    'bg-gradient-to-br from-rose-500 to-pink-600',
+    'bg-gradient-to-br from-emerald-500 to-teal-600',
+    'bg-gradient-to-br from-violet-500 to-purple-600',
+    'bg-gradient-to-br from-amber-500 to-orange-600',
+    'bg-gradient-to-br from-cyan-500 to-blue-600'
+]
+
+IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200"
 
 # --- [新增] 导航菜单配置 ---
 NAV_ITEMS = [
@@ -246,16 +257,22 @@ def create_user_home():
                         )
 
                         if not movies:
-                            ui.label('该分类下暂无数据...').classes('text-slate-400 py-10')
+                            with ui.column().classes('w-full items-center py-20'):
+                                ui.icon('sentiment_dissatisfied', size='4em', color='grey-4')
+                                ui.label('该分类下暂无数据...').classes('text-slate-400 text-lg mt-4')
                         else:
-                            with ui.grid(columns=3).classes('w-full gap-6'):
+                            # 【修改】使用响应式 Grid：手机2列，平板3列，电脑4-5列
+                            with ui.grid(columns=None).classes(
+                                    'w-full gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'):
                                 for index, m in enumerate(movies):
-                                    bg = BG_COLORS[index % len(BG_COLORS)]
-                                    display_rating = str(m.averageRating) if m.averageRating else 'N/A'
+                                    # 随机渐变背景
+                                    bg_gradient = BG_GRADIENTS[index % len(BG_GRADIENTS)]
 
-                                    with ui.card().classes(
-                                            'w-full h-[320px] p-0 gap-0 shadow hover:shadow-lg transition-all group relative'):
-                                        # 收藏按钮
+                                    # 卡片容器：增加 overflow-hidden 防止图片放大溢出，增加圆角和阴影
+                                    with ui.card().classes('w-full h-[360px] p-0 gap-0 shadow-md hover:shadow-xl transition-all duration-300 group relative cursor-pointer border-none rounded-xl overflow-hidden') \
+                                            .on('click', lambda _, mid=m.tconst: movie_detail.open_movie_detail_dialog(mid)):
+
+                                        # --- 1. 顶部：收藏按钮 (浮动) ---
                                         if is_login:
                                             is_fav = m.tconst in my_favs
                                             fav_icon = 'favorite' if is_fav else 'favorite_border'
@@ -263,57 +280,78 @@ def create_user_home():
                                             ui.button(icon=fav_icon,
                                                       on_click=lambda e, mid=m.tconst: toggle_fav(e, mid)) \
                                                 .props(f'flat round color={fav_color} dense') \
-                                                .classes('absolute top-2 right-2 z-20 bg-black/20 backdrop-blur-sm')
+                                                .classes(
+                                                'absolute top-2 right-2 z-20 bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors')
 
-                                        # 封面
+                                        # --- 2. 核心：封面区域 (占高度 70%) ---
                                         with ui.column().classes(
-                                                f'w-full h-[55%] {bg} items-center justify-center relative overflow-hidden'):
-                                            ui.label(m.primaryTitle[:1]).classes(
-                                                'text-8xl text-white opacity-30 font-black group-hover:scale-110 transition-transform')
-                                            ui.label(str(m.startYear)).classes(
-                                                'absolute bottom-2 left-2 bg-black/40 text-white text-xs px-2 rounded-full')
+                                                f'w-full h-[70%] {bg_gradient} items-center justify-center relative overflow-hidden'):
 
-                                        # 内容
-                                        with ui.column().classes('w-full h-[45%] p-3 justify-between bg-white'):
+                                            # A. 有海报
+                                            if hasattr(m, 'poster_path') and m.poster_path:
+                                                ui.image(f"{IMAGE_BASE_URL}{m.poster_path}") \
+                                                    .classes(
+                                                    'w-full h-full object-cover transition-transform duration-700 group-hover:scale-110')
+                                                # 评分徽章 (有图时显示在左下角)
+                                                if m.averageRating:
+                                                    ui.label(f'★ {m.averageRating}').classes(
+                                                        'absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm z-10')
+
+                                            # B. 无海报 (美化版兜底)
+                                            else:
+                                                # 大首字母
+                                                ui.label(m.primaryTitle[:1].upper()).classes(
+                                                    'text-7xl text-white opacity-20 font-black select-none group-hover:scale-110 transition-transform duration-500')
+                                                # 无封面提示
+                                                with ui.row().classes(
+                                                        'absolute bottom-0 w-full p-2 bg-gradient-to-t from-black/60 to-transparent items-end justify-between'):
+                                                    ui.label(str(m.startYear)).classes(
+                                                        'text-white text-xs font-bold bg-white/20 px-2 rounded')
+                                                    if m.averageRating:
+                                                        ui.label(f'★ {m.averageRating}').classes(
+                                                            'text-orange-400 text-sm font-bold')
+
+                                        # --- 3. 底部：信息区域 (占高度 30%) ---
+                                        with ui.column().classes(
+                                                'w-full h-[30%] p-3 justify-between bg-white relative'):
+                                            # 标题 (限制2行)
                                             ui.label(m.primaryTitle).classes(
-                                                'font-bold text-sm leading-tight line-clamp-2 h-10 text-slate-800')
-                                            with ui.row().classes('gap-1'):
-                                                # 简单的类型展示
-                                                genres = (m.genres or '').split(',')[:2]
-                                                for g in genres:
-                                                    ui.label(g).classes(
-                                                        'text-[10px] text-slate-500 bg-slate-100 px-1.5 rounded')
-                                            ui.separator().classes('my-1')
+                                                'font-bold text-sm leading-snug line-clamp-2 text-slate-800 group-hover:text-primary transition-colors')
 
-                                            with ui.row().classes('w-full justify-between items-center'):
-                                                ui.label(f'IMDb: {display_rating}').classes(
-                                                    'text-xs font-bold text-slate-500')
+                                            # 底部元数据
+                                            with ui.row().classes('w-full justify-between items-center mt-1'):
+                                                # 类型标签
+                                                genres = (m.genres or '').split(',')[:1]  # 只显示1个类型防止换行
+                                                ui.label(genres[0] if genres else 'Movie').classes(
+                                                    'text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full')
+
+                                                # 打分按钮/时长
                                                 if is_login:
                                                     my_score = my_ratings.get(m.tconst)
-                                                    btn_text = str(my_score) if my_score else '打分'
-                                                    btn_color = 'orange' if my_score else 'grey-5'
-                                                    ui.button(btn_text, icon='star' if my_score else 'star_outline',
-                                                              on_click=lambda mid=m.tconst, t=m.primaryTitle,
-                                                                              s=my_score: open_rate_dialog(mid, t, s)) \
-                                                        .props(f'flat dense size=sm color={btn_color}')
+                                                    icon = 'star' if my_score else 'star_outline'
+                                                    color = 'orange' if my_score else 'grey-4'
+                                                    ui.button(icon=icon, on_click=lambda mid=m.tconst, t=m.primaryTitle,
+                                                                                         s=my_score: open_rate_dialog(
+                                                        mid, t, s)) \
+                                                        .props(f'flat dense size=xs color={color}').classes('p-0')
                                                 else:
-                                                    ui.label(f'{m.runtimeMinutes or "?"} min').classes(
+                                                    ui.label(f'{m.runtimeMinutes} min').classes(
                                                         'text-xs text-slate-400')
 
-                            with ui.row().classes('w-full justify-center items-center mt-10 gap-4'):
-                                # 上一页按钮
+                            # 翻页器
+                            with ui.row().classes('w-full justify-center items-center mt-12 gap-4 mb-10'):
                                 ui.button('上一页', on_click=lambda: change_page(-1)) \
-                                    .props('flat color=grey-7 icon=chevron_left') \
+                                    .props('flat color=slate-600 icon=chevron_left') \
                                     .bind_visibility_from(pagination, 'page', backward=lambda p: p > 1)
 
-                                # 页码显示 (直接使用 f-string 显示，不需要 bind)
-                                ui.label(f"第 {pagination['page']} 页 / 共 {pagination['total_pages']} 页") \
-                                    .classes('text-slate-600 font-medium bg-slate-100 px-4 py-1 rounded-full text-sm')
+                                ui.label(f"Page {pagination['page']} / {pagination['total_pages']}") \
+                                    .classes(
+                                    'text-slate-500 font-mono text-sm bg-white px-4 py-1 rounded shadow-sm border')
 
-                                # 下一页按钮
                                 ui.button('下一页', on_click=lambda: change_page(1)) \
                                     .props('flat color=primary icon-right=chevron_right') \
-                                    .bind_visibility_from(pagination, 'page', backward=lambda p: p < pagination['total_pages'])
+                                    .bind_visibility_from(pagination, 'page',
+                                                          backward=lambda p: p < pagination['total_pages'])
 
                     # === 右侧：侧边栏 ===
                     if is_login and not query:

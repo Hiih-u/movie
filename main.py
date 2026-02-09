@@ -4,7 +4,7 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home, episode_management, user_favorites, user_ratings
+    crew_management, register_page, user_home, episode_management, user_favorites, user_ratings, movie_detail
 )
 from services import recommendation_service
 
@@ -153,6 +153,10 @@ def page_user_ratings():
 def handle_startup():
     print("🚀 系统启动中...")
     recommendation_service.load_model()
+
+@ui.page('/movie/{tconst}')
+def movie_detail_route(tconst: str):
+    movie_detail.create_detail_page(tconst)
 
 app.on_startup(handle_startup)
 

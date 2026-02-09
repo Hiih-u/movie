@@ -121,7 +121,7 @@ async def refresh_movie_summary():
             # 我们直接从 title_basics 表里取 titletype
             stmt = text("""
                         INSERT INTO movie_summary (tconst, "titleType", "primaryTitle", "startYear", "runtimeMinutes", genres,
-                                                   "averageRating", "numVotes")
+                                                   "averageRating", "numVotes", poster_path)
                         SELECT b.tconst,
                                b.titletype,      -- 【新增】写入类型
                                b.primarytitle,
@@ -129,7 +129,8 @@ async def refresh_movie_summary():
                                b.runtimeminutes,
                                b.genres,
                                r.averagerating,
-                               r.numvotes
+                               r.numvotes,
+                               b.poster_path
                         FROM title_basics b
                                  LEFT JOIN title_ratings r ON b.tconst = r.tconst
                         WHERE b.titletype IN ('movie', 'tvSeries', 'tvMiniSeries', 'tvMovie', 'short')

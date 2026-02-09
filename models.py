@@ -26,6 +26,12 @@ class TitleBasics(Base):
     runtimeMinutes = Column("runtimeminutes", Integer)
     genres = Column("genres", String)
 
+    # 【新增】TMDB 相关字段
+    poster_path = Column(String, nullable=True)  # 海报路径 (如 /example.jpg)
+    backdrop_path = Column(String, nullable=True)  # 背景大图
+    overview = Column(String, nullable=True)  # 剧情简介 (存中文)
+    tmdb_id = Column(String, nullable=True)  # TMDB ID
+
     # 关联配置
     rating = relationship("TitleRatings", back_populates="movie", uselist=False)
     crew = relationship("TitleCrew", back_populates="movie", uselist=False)
@@ -113,6 +119,9 @@ class MovieSummary(Base):
     # 把评分表的数据也搬过来
     averageRating = Column(Float)
     numVotes = Column(Integer, index=True)  # 加索引，排序飞快
+
+    # 【新增】缓存海报，提高首页加载速度
+    poster_path = Column(String, nullable=True)
 
 # 6. 用户收藏表
 class UserFavorite(Base):
