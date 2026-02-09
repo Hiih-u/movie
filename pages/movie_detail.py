@@ -3,7 +3,7 @@ from nicegui import ui
 from services import tmdb_service
 
 
-async def open_movie_detail_dialog(tconst: str):
+async def open_movie_detail_dialog(tconst: str, on_close=None):
     """
     打开电影详情弹窗 (Modal)
     """
@@ -24,6 +24,9 @@ async def open_movie_detail_dialog(tconst: str):
         ui.button(icon='close', on_click=dialog.close) \
             .props('flat round dense text-color=white') \
             .classes('absolute top-4 right-4 z-40 bg-black/30 hover:bg-black/50 backdrop-blur-sm transition-all')
+
+        if on_close:
+            dialog.on('close', on_close)
 
         dialog.open()
 

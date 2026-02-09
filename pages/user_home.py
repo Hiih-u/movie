@@ -133,14 +133,19 @@ def create_user_home():
     content_div = ui.column().classes('w-full min-h-screen bg-slate-50 items-center')
 
     # --- 交互逻辑 (收藏/评分) ---
-    async def toggle_fav(e, tconst):
+    async def toggle_fav(btn, tconst):
         if not is_login:
             ui.notify('请先登录', type='warning')
             return
         is_added, msg = await interaction_service.toggle_favorite(user_id, tconst)
-        ui.notify(msg, type='positive' if is_added else 'info')
-        btn = e.sender
-        btn.props('icon=favorite color=red' if is_added else 'icon=favorite_border color=white')
+        if is_added:
+            # 收藏成功：变红心
+            btn.props('icon=favorite color=red')
+            ui.notify('已加入收藏', type='positive', position='top')
+        else:
+            # 取消收藏：变空心白
+            btn.props('icon=favorite_border color=white')
+            ui.notify('已取消收藏', type='info', position='top')
 
     async def change_page(delta):
         """
@@ -159,19 +164,27 @@ def create_user_home():
         # 加载数据 (这一步会执行 content_div.clear() 删除旧按钮)
         await load_movies(query=search_input.value)
 
-    def open_rate_dialog(tconst, title, current_score=0):
+    def open_rate_dialog(tconst, title, current_score=0, btn=None):
         if not is_login:
             ui.notify('请先登录', type='warning')
             return
+
         with ui.dialog() as dialog, ui.card().classes('w-96'):
             ui.label(f'给 "{title}" 打分').classes('text-lg font-bold')
-            slider = ui.slider(min=1, max=10, step=0.5, value=current_score or 8.0).props('label-always color=orange')
+            # 评分滑块
+            slider = ui.slider(min=1, max=10, step=0.5, value=current_score or 8.0) \
+                .props('label-always color=orange')
 
             async def save():
+                # 1. 后台提交
                 await interaction_service.set_user_rating(user_id, tconst, slider.value)
-                ui.notify('评分成功！', type='positive')
+                ui.notify(f'打分成功: {slider.value}', type='positive')
+
+                # 2. 前端反馈 (如果传入了按钮对象，就点亮它)
+                if btn:
+                    btn.props('icon=star color=orange')
+
                 dialog.close()
-                await load_movies(search_input.value)
 
             with ui.row().classes('w-full justify-end q-mt-md'):
                 ui.button('取消', on_click=dialog.close).props('flat')
@@ -263,25 +276,25 @@ def create_user_home():
                         else:
                             # 【修改】使用响应式 Grid：手机2列，平板3列，电脑4-5列
                             with ui.grid(columns=None).classes(
-                                    'w-full gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'):
+                                    'w-full gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4'):
                                 for index, m in enumerate(movies):
                                     # 随机渐变背景
                                     bg_gradient = BG_GRADIENTS[index % len(BG_GRADIENTS)]
 
                                     # 卡片容器：增加 overflow-hidden 防止图片放大溢出，增加圆角和阴影
-                                    with ui.card().classes('w-full h-[360px] p-0 gap-0 shadow-md hover:shadow-xl transition-all duration-300 group relative cursor-pointer border-none rounded-xl overflow-hidden') \
-                                            .on('click', lambda _, mid=m.tconst: movie_detail.open_movie_detail_dialog(mid)):
+                                    with ui.card().classes('...') \
+                                            .on('click',
+                                                lambda _, mid=m.tconst: movie_detail.open_movie_detail_dialog(mid)):
 
                                         # --- 1. 顶部：收藏按钮 (浮动) ---
                                         if is_login:
                                             is_fav = m.tconst in my_favs
                                             fav_icon = 'favorite' if is_fav else 'favorite_border'
                                             fav_color = 'red' if is_fav else 'white'
-                                            ui.button(icon=fav_icon,
-                                                      on_click=lambda e, mid=m.tconst: toggle_fav(e, mid)) \
-                                                .props(f'flat round color={fav_color} dense') \
-                                                .classes(
-                                                'absolute top-2 right-2 z-20 bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors')
+                                            with ui.button(icon=fav_icon) as fav_btn:
+                                                fav_btn.props(f'flat round color={fav_color} dense') \
+                                                    .classes('absolute top-2 right-2 z-20 bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors') \
+                                                    .on('click.stop', lambda _, b=fav_btn, mid=m.tconst: toggle_fav(b, mid))
 
                                         # --- 2. 核心：封面区域 (占高度 70%) ---
                                         with ui.column().classes(
@@ -330,13 +343,12 @@ def create_user_home():
                                                     my_score = my_ratings.get(m.tconst)
                                                     icon = 'star' if my_score else 'star_outline'
                                                     color = 'orange' if my_score else 'grey-4'
-                                                    ui.button(icon=icon, on_click=lambda mid=m.tconst, t=m.primaryTitle,
-                                                                                         s=my_score: open_rate_dialog(
-                                                        mid, t, s)) \
-                                                        .props(f'flat dense size=xs color={color}').classes('p-0')
+                                                    ui.button(icon=icon) \
+                                                        .props(f'flat dense size=xs color={color}').classes('p-0') \
+                                                        .on('click.stop', lambda e, mid=m.tconst, t=m.primaryTitle,
+                                                                                 s=my_score: open_rate_dialog(mid, t, s, btn=e.sender))
                                                 else:
-                                                    ui.label(f'{m.runtimeMinutes} min').classes(
-                                                        'text-xs text-slate-400')
+                                                    ui.label(f'{m.runtimeMinutes} min').classes('text-xs text-slate-400')
 
                             # 翻页器
                             with ui.row().classes('w-full justify-center items-center mt-12 gap-4 mb-10'):
