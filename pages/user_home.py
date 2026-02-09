@@ -66,7 +66,8 @@ async def open_mood_dialog(mood, category='all'):
                     for m in movies:
                         # 卡片样式优化
                         with ui.card().classes(
-                                'w-full p-3 shadow-sm border border-purple-50 hover:shadow-md transition-all'):
+                                'w-full p-3 shadow-sm border border-purple-50 hover:shadow-md transition-all cursor-pointer') \
+                                .on('click', lambda _, mid=m['tconst']: movie_detail.open_movie_detail_dialog(mid)):
                             with ui.row().classes('w-full justify-between items-start no-wrap'):
                                 with ui.column().classes('gap-1 flex-1'):
                                     ui.label(m['primaryTitle']).classes(
@@ -74,9 +75,9 @@ async def open_mood_dialog(mood, category='all'):
                                     with ui.row().classes('items-center gap-2'):
                                         ui.label(str(m['startYear'])).classes(
                                             'text-xs text-slate-500 bg-slate-100 px-1.5 rounded')
-                                        # 简单截取 genres
-                                        ui.label(m['genres'].replace(',', ' / ')).classes('text-xs text-purple-500')
 
+                                        genres_str = (m['genres'] or '').replace(',', ' / ')
+                                        ui.label(genres_str).classes('text-xs text-purple-500')
                                 with ui.column().classes('items-end'):
                                     ui.label(f"★ {m['averageRating']}").classes('font-bold text-orange-500 text-lg')
 
@@ -487,16 +488,26 @@ def create_user_home():
                                 if data_source:
                                     with ui.column().classes('w-full gap-3'):
                                         for idx, m in enumerate(data_source):
+                                            tconst = m.tconst if hasattr(m, 'tconst') else m['tconst']
                                             title = m.primaryTitle if hasattr(m, 'primaryTitle') else m['primaryTitle']
                                             rating = m.averageRating if hasattr(m, 'averageRating') else m[
                                                 'averageRating']
-                                            with ui.row().classes('w-full items-start justify-between group'):
+                                            with ui.row().classes(
+                                                    'w-full items-start justify-between group cursor-pointer') \
+                                                    .on('click',
+                                                        lambda _, mid=tconst: movie_detail.open_movie_detail_dialog(
+                                                            mid)):
                                                 with ui.row().classes('gap-2 flex-1 flex-nowrap items-start'):
+                                                    # 序号颜色
                                                     color_cls = 'text-orange-500' if idx < 3 else 'text-slate-400'
                                                     ui.label(str(idx + 1)).classes(
                                                         f'font-bold text-sm {color_cls} w-4 flex-shrink-0 leading-tight')
+
+                                                    # 标题 (增加 hover 变色)
                                                     ui.label(title).classes(
                                                         'text-sm text-slate-600 group-hover:text-primary transition-colors leading-tight flex-1 break-words')
+
+                                                # 评分
                                                 ui.label(str(rating)).classes(
                                                     'text-xs font-bold text-orange-400 q-ml-sm')
                                 else:
