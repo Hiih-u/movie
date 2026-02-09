@@ -107,6 +107,14 @@ async def get_movie_count(search_query=None):
         return result.scalar()
 
 
+# 【新增】快速获取海报路径
+async def get_poster_path(tconst):
+    async with AsyncSessionLocal() as db:
+        stmt = select(MovieSummary.poster_path).where(MovieSummary.tconst == tconst)
+        result = await db.execute(stmt)
+        return result.scalar()
+
+
 # --- 【新增】数据同步功能 (ETL) ---
 async def refresh_movie_summary():
     """

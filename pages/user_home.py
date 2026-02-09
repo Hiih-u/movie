@@ -191,6 +191,23 @@ def create_user_home():
                 ui.button('提交', on_click=save).props('unelevated color=orange')
         dialog.open()
 
+    async def refresh_card_cover(cover_container, tconst, bg_gradient, rating, year):
+        # 1. 查库：看看现在有没有海报了
+        new_poster = await movie_service.get_poster_path(tconst)
+
+        # 2. 如果有海报，就清空彩色块，换成图片
+        if new_poster:
+            cover_container.clear()
+            with cover_container:
+                # 显示图片 (覆盖背景色)
+                ui.image(f"{IMAGE_BASE_URL}{new_poster}") \
+                    .classes('w-full h-full object-cover transition-transform duration-700 group-hover:scale-110')
+                # 补回左下角的评分/年份角标 (因为 clear() 把它们也清掉了)
+                if rating:
+                    ui.label(f'★ {rating}').classes(
+                        'absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm z-10')
+
+
     # --- [核心] 加载数据逻辑 ---
     async def load_movies(query=None):
         content_div.clear()
@@ -281,11 +298,20 @@ def create_user_home():
                                     # 随机渐变背景
                                     bg_gradient = BG_GRADIENTS[index % len(BG_GRADIENTS)]
 
-                                    # 卡片容器：增加 overflow-hidden 防止图片放大溢出，增加圆角和阴影
-                                    with ui.card().classes('...') \
-                                            .on('click',
-                                                lambda _, mid=m.tconst: movie_detail.open_movie_detail_dialog(mid)):
+                                    # 1. 定义点击事件：打开详情页，且关闭时尝试刷新封面
+                                    async def on_card_click(e, mid=m.tconst, container=None, bg=bg_gradient,
+                                                            r=m.averageRating, y=m.startYear):
+                                        await movie_detail.open_movie_detail_dialog(
+                                            mid,
+                                            # 【核心】关闭弹窗后，只刷新这一个容器
+                                            on_close=lambda: refresh_card_cover(container, mid, bg, r, y)
+                                        )
 
+                                    card = ui.card().classes(
+                                        'w-full h-[360px] p-0 gap-0 shadow-md hover:shadow-xl transition-all duration-300 group relative cursor-pointer border-none rounded-xl overflow-hidden')
+
+                                    # 卡片容器：增加 overflow-hidden 防止图片放大溢出，增加圆角和阴影
+                                    with card:
                                         # --- 1. 顶部：收藏按钮 (浮动) ---
                                         if is_login:
                                             is_fav = m.tconst in my_favs
@@ -297,25 +323,20 @@ def create_user_home():
                                                     .on('click.stop', lambda _, b=fav_btn, mid=m.tconst: toggle_fav(b, mid))
 
                                         # --- 2. 核心：封面区域 (占高度 70%) ---
-                                        with ui.column().classes(
-                                                f'w-full h-[70%] {bg_gradient} items-center justify-center relative overflow-hidden'):
-
-                                            # A. 有海报
+                                        cover_box = ui.column().classes(f'w-full h-[70%] {bg_gradient} items-center justify-center relative overflow-hidden')
+                                        with cover_box:
+                                            # A. 初始状态：有图显示图，没图显示彩色块
                                             if hasattr(m, 'poster_path') and m.poster_path:
                                                 ui.image(f"{IMAGE_BASE_URL}{m.poster_path}") \
                                                     .classes(
                                                     'w-full h-full object-cover transition-transform duration-700 group-hover:scale-110')
-                                                # 评分徽章 (有图时显示在左下角)
                                                 if m.averageRating:
                                                     ui.label(f'★ {m.averageRating}').classes(
                                                         'absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm z-10')
-
-                                            # B. 无海报 (美化版兜底)
                                             else:
-                                                # 大首字母
+                                                # 无图：显示首字母
                                                 ui.label(m.primaryTitle[:1].upper()).classes(
                                                     'text-7xl text-white opacity-20 font-black select-none group-hover:scale-110 transition-transform duration-500')
-                                                # 无封面提示
                                                 with ui.row().classes(
                                                         'absolute bottom-0 w-full p-2 bg-gradient-to-t from-black/60 to-transparent items-end justify-between'):
                                                     ui.label(str(m.startYear)).classes(
@@ -327,18 +348,14 @@ def create_user_home():
                                         # --- 3. 底部：信息区域 (占高度 30%) ---
                                         with ui.column().classes(
                                                 'w-full h-[30%] p-3 justify-between bg-white relative'):
-                                            # 标题 (限制2行)
                                             ui.label(m.primaryTitle).classes(
                                                 'font-bold text-sm leading-snug line-clamp-2 text-slate-800 group-hover:text-primary transition-colors')
 
-                                            # 底部元数据
                                             with ui.row().classes('w-full justify-between items-center mt-1'):
-                                                # 类型标签
-                                                genres = (m.genres or '').split(',')[:1]  # 只显示1个类型防止换行
+                                                genres = (m.genres or '').split(',')[:1]
                                                 ui.label(genres[0] if genres else 'Movie').classes(
                                                     'text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full')
 
-                                                # 打分按钮/时长
                                                 if is_login:
                                                     my_score = my_ratings.get(m.tconst)
                                                     icon = 'star' if my_score else 'star_outline'
@@ -346,9 +363,21 @@ def create_user_home():
                                                     ui.button(icon=icon) \
                                                         .props(f'flat dense size=xs color={color}').classes('p-0') \
                                                         .on('click.stop', lambda e, mid=m.tconst, t=m.primaryTitle,
-                                                                                 s=my_score: open_rate_dialog(mid, t, s, btn=e.sender))
+                                                                                 s=my_score: open_rate_dialog(mid,
+                                                                                                              t, s,
+                                                                                                              btn=e.sender))
                                                 else:
-                                                    ui.label(f'{m.runtimeMinutes} min').classes('text-xs text-slate-400')
+                                                    ui.label(f'{m.runtimeMinutes} min').classes(
+                                                        'text-xs text-slate-400')
+
+                                        # 4. 绑定点击事件 (此时 cover_box 已经明确定义)
+                                        card.on('click',
+                                                lambda _, mid=m.tconst, box=cover_box, bg=bg_gradient,
+                                                       r=m.averageRating, y=m.startYear:
+                                                movie_detail.open_movie_detail_dialog(mid,
+                                                                                      on_close=lambda: refresh_card_cover(
+                                                                                          box, mid, bg, r, y)))
+
 
                             # 翻页器
                             with ui.row().classes('w-full justify-center items-center mt-12 gap-4 mb-10'):
