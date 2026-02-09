@@ -3,7 +3,7 @@ import httpx
 from sqlalchemy import update, select
 from sqlalchemy.orm import joinedload
 from database import AsyncSessionLocal
-from models import TitleBasics, MovieSummary  # <--- 确保引入 MovieSummary
+from models import TitleBasics, MovieSummary, NameBasics  # <--- 确保引入 MovieSummary
 
 # 【配置】请替换为你申请的 TMDB API Key
 TMDB_API_KEY = "0c58404536be73794e2b11afedfbd6b7"
@@ -13,14 +13,18 @@ IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 
 async def get_movie_info(tconst: str):
     """
-    获取电影详情 (修复版：同步更新 MovieSummary)
+    获取电影详情 (包含导演、编剧信息)
     """
     print(f"\n🔍 [TMDB] 开始获取详情: {tconst}")
+
     async with AsyncSessionLocal() as db:
-        # 1. 查库 (带预加载)
+        # 1. 查库 (同时预加载 评分 和 剧组信息)
         stmt = (
             select(TitleBasics)
-            .options(joinedload(TitleBasics.rating))
+            .options(
+                joinedload(TitleBasics.rating),
+                joinedload(TitleBasics.crew)  # 【修改】预加载剧组表
+            )
             .where(TitleBasics.tconst == tconst)
         )
         result = await db.execute(stmt)
@@ -30,6 +34,34 @@ async def get_movie_info(tconst: str):
             print(f"❌ [TMDB] 本地数据库未找到电影: {tconst}")
             return None
 
+        # --- 【新增】解析导演和编剧姓名 ---
+        directors_names = []
+        writers_names = []
+
+        # 内部函数：将 "nm1,nm2" 转换为 ["Name1", "Name2"]
+        async def resolve_names(nconst_str):
+            if not nconst_str:
+                return []
+            # 分割 ID 字符串
+            nconst_list = nconst_str.split(',')
+            # 查询 NameBasics 表
+            stmt_names = select(NameBasics.primaryName).where(NameBasics.nconst.in_(nconst_list))
+            res = await db.execute(stmt_names)
+            return res.scalars().all()
+
+        # 如果有剧组信息，开始解析
+        if movie.crew:
+            if movie.crew.directors:
+                directors_names = await resolve_names(movie.crew.directors)
+            if movie.crew.writers:
+                writers_names = await resolve_names(movie.crew.writers)
+
+        # Log 打印一下看看
+        if directors_names:
+            print(f"   - 导演: {', '.join(directors_names)}")
+        if writers_names:
+            print(f"   - 编剧: {', '.join(writers_names)}")
+
         # --- 2. 准备基础数据 ---
         info = {
             "title": movie.primaryTitle,
@@ -38,17 +70,21 @@ async def get_movie_info(tconst: str):
             "backdrop_url": f"{IMAGE_BASE_URL}{movie.backdrop_path}" if movie.backdrop_path else None,
             "overview": movie.overview if movie.overview else "暂无剧情简介（数据完善中...）",
             "genres": movie.genres,
-            "rating": movie.rating.averageRating if movie.rating else "N/A"
+            "rating": movie.rating.averageRating if movie.rating else "N/A",
+
+            # 【新增】返回导演和编剧列表
+            "directors": directors_names,
+            "writers": writers_names
         }
 
-        # --- 3. 检查是否需要更新 ---
-        # 如果已经有图和简介，直接返回
+        # --- 3. 检查是否需要更新 (保持原有逻辑) ---
         if movie.poster_path and movie.overview:
-            print(f"✅ [TMDB] 命中本地缓存，无需请求 API")
+            print(f"✅ [TMDB] 命中本地缓存")
             return info
 
-        # --- 4. 尝试调用 API 补全数据 ---
+        # --- 4. 尝试调用 API 补全海报/简介 ---
         print(f"🚀 [TMDB] 本地缺失海报/简介，正在请求 API... (ID: {tconst})")
+
         try:
             async with httpx.AsyncClient() as client:
                 url = f"{BASE_URL}/find/{tconst}"
@@ -57,22 +93,16 @@ async def get_movie_info(tconst: str):
                     "external_source": "imdb_id",
                     "language": "zh-CN"
                 }
-                resp = await client.get(url, params=params, timeout=5.0)
-                print(f"📡 [TMDB] API 响应状态码: {resp.status_code}")
+
+                resp = await client.get(url, params=params, timeout=10.0)
 
                 if resp.status_code == 200:
                     data = resp.json()
-                    result_count = len(data.get("movie_results", [])) + len(data.get("tv_results", []))
-                    print(f"📦 [TMDB] API 返回结果数: {result_count}")
-
                     tmdb_data = None
-                    # 查找匹配结果
                     if data.get("movie_results"):
                         tmdb_data = data["movie_results"][0]
-                        print("👉 识别为: 电影 (Movie)")
                     elif data.get("tv_results"):
                         tmdb_data = data["tv_results"][0]
-                        print("👉 识别为: 剧集 (TV)")
 
                     if tmdb_data:
                         poster = tmdb_data.get("poster_path")
@@ -80,17 +110,12 @@ async def get_movie_info(tconst: str):
                         overview = tmdb_data.get("overview")
                         tmdb_id = str(tmdb_data.get("id"))
 
-                        print(f"   - Poster: {poster}")
-                        print(f"   - Overview len: {len(overview) if overview else 0}")
-
-                        # [更新 A] 更新主表 TitleBasics
+                        # 更新数据库
                         movie.poster_path = poster
                         movie.backdrop_path = backdrop
                         movie.overview = overview
                         movie.tmdb_id = tmdb_id
 
-                        # [更新 B] 同步更新首页缓存表 MovieSummary (关键修改！)
-                        # 只有当 MovieSummary 里也有这部电影时才更新
                         if poster:
                             stmt_summary = (
                                 update(MovieSummary)
@@ -98,24 +123,20 @@ async def get_movie_info(tconst: str):
                                 .values(poster_path=poster)
                             )
                             await db.execute(stmt_summary)
-                            print("💾 [TMDB] 已同步更新 MovieSummary 表")
 
-                        # 提交所有修改
                         await db.commit()
-                        print("✅ [TMDB] 数据库更新成功！")
+                        print("✅ [TMDB] API 数据更新成功！")
 
-                        # 更新返回的 info 对象
+                        # 更新 info
                         info["poster_url"] = f"{IMAGE_BASE_URL}{poster}" if poster else None
                         info["backdrop_url"] = f"{IMAGE_BASE_URL}{backdrop}" if backdrop else None
                         info["overview"] = overview
                     else:
-                        print(f"⚠️ [TMDB] API 请求成功，但未在结果中找到匹配项 (Results 为空)")
-                        print(f"   - 排查建议: 请确认 {tconst} 是否为有效的 IMDb 编号")
+                        print(f"⚠️ [TMDB] API 未找到匹配项")
                 else:
-                    print(f"❌ [TMDB] API 请求失败: {resp.text}")
+                    print(f"❌ [TMDB] API 请求失败: {resp.status_code}")
 
         except Exception as e:
-            print(f"🔥 [TMDB] 发生异常: {str(e)}")
-            # 失败不回滚，返回已有信息
+            print(f"🔥 [TMDB] 异常: {str(e)}")
 
         return info

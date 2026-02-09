@@ -100,8 +100,11 @@ async def open_movie_detail_dialog(tconst: str, on_close=None):
 
                     # 底部信息占位 (演职员表等)
                     with ui.row().classes('gap-8 w-full'):
-                        _info_item('导演', 'Coming Soon')
-                        _info_item('编剧', 'Coming Soon')
+                        directors_str = " / ".join(info.get('directors', [])) or "未知"
+                        writers_str = " / ".join(info.get('writers', [])) or "未知"
+
+                        _info_item('导演', directors_str)
+                        _info_item('编剧', writers_str)
                         _info_item('语言', 'English / Chinese')
 
 
