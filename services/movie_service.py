@@ -107,6 +107,14 @@ async def get_movie_count(search_query=None):
         return result.scalar()
 
 
+# 【新增】快速获取海报路径
+async def get_poster_path(tconst):
+    async with AsyncSessionLocal() as db:
+        stmt = select(MovieSummary.poster_path).where(MovieSummary.tconst == tconst)
+        result = await db.execute(stmt)
+        return result.scalar()
+
+
 # --- 【新增】数据同步功能 (ETL) ---
 async def refresh_movie_summary():
     """
@@ -121,7 +129,7 @@ async def refresh_movie_summary():
             # 我们直接从 title_basics 表里取 titletype
             stmt = text("""
                         INSERT INTO movie_summary (tconst, "titleType", "primaryTitle", "startYear", "runtimeMinutes", genres,
-                                                   "averageRating", "numVotes")
+                                                   "averageRating", "numVotes", poster_path)
                         SELECT b.tconst,
                                b.titletype,      -- 【新增】写入类型
                                b.primarytitle,
@@ -129,7 +137,8 @@ async def refresh_movie_summary():
                                b.runtimeminutes,
                                b.genres,
                                r.averagerating,
-                               r.numvotes
+                               r.numvotes,
+                               b.poster_path
                         FROM title_basics b
                                  LEFT JOIN title_ratings r ON b.tconst = r.tconst
                         WHERE b.titletype IN ('movie', 'tvSeries', 'tvMiniSeries', 'tvMovie', 'short')

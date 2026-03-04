@@ -17,6 +17,8 @@ def create_rating_page():
         with ui.column().classes('w-full q-pa-sm'):
             ui.button('仪表盘', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
                 'flat')
+            ui.button('数据统计', icon='analytics', on_click=lambda: ui.navigate.to('/admin/analytics')).classes(
+                'w-full').props('flat')
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(

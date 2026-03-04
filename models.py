@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, DateTime, UniqueConstraint, BigInteger
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -25,6 +25,12 @@ class TitleBasics(Base):
 
     runtimeMinutes = Column("runtimeminutes", Integer)
     genres = Column("genres", String)
+
+    # 【新增】TMDB 相关字段
+    poster_path = Column(String, nullable=True)  # 海报路径 (如 /example.jpg)
+    backdrop_path = Column(String, nullable=True)  # 背景大图
+    overview = Column(String, nullable=True)  # 剧情简介 (存中文)
+    tmdb_id = Column(String, nullable=True)  # TMDB ID
 
     # 关联配置
     rating = relationship("TitleRatings", back_populates="movie", uselist=False)
@@ -114,6 +120,9 @@ class MovieSummary(Base):
     averageRating = Column(Float)
     numVotes = Column(Integer, index=True)  # 加索引，排序飞快
 
+    # 【新增】缓存海报，提高首页加载速度
+    poster_path = Column(String, nullable=True)
+
 # 6. 用户收藏表
 class UserFavorite(Base):
     __tablename__ = "user_favorites"
@@ -150,3 +159,43 @@ class SparkRecommendation(Base):
     tconst = Column(String, index=True)    # 推荐了哪部电影
     score = Column(Float)                  # 推荐分数 (预测评分)
     algorithm = Column(String, default="ALS") # 算法名称，方便以后对比
+
+
+class DoubanTop250(Base):
+    """
+    存储豆瓣 Top 250 榜单数据
+    """
+    __tablename__ = "douban_top250"
+
+    id = Column(Integer, primary_key=True, index=True)
+    rank = Column(Integer, index=True)  # 排名 (1-250)
+    title = Column(String)  # 中文电影名
+    douban_id = Column(String, unique=True, index=True)  # 豆瓣 ID (如 1292052)
+    imdb_id = Column(String, index=True)  # IMDb ID (如 tt0111161)
+
+    douban_score = Column(Float)
+
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class MovieBoxOffice(Base):
+    """
+    【新增】专门存储电影票房数据的表
+    独立存储，方便爬虫单独维护
+    """
+    __tablename__ = "movie_box_office"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tconst = Column(String, ForeignKey("title_basics.tconst"), unique=True, index=True)
+
+    # 票房金额 (美元)，使用 BigInteger 防止溢出
+    box_office = Column(BigInteger, nullable=True)
+
+    # 爬取排名 (例如 Top 1000 中的第几名)
+    rank = Column(Integer, nullable=True)
+
+    # 最后更新时间
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 建立关联
+    movie = relationship("TitleBasics", backref="box_office_data")

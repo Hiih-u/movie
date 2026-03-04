@@ -4,13 +4,14 @@ from nicegui import ui, app
 from pages import (
     admin_dashboard, login_page, user_management,
     person_management, movie_management, rating_management,
-    crew_management, register_page, user_home, episode_management, user_favorites, user_ratings
+    crew_management, register_page, user_home, episode_management, user_favorites, user_ratings, movie_detail,
+    admin_analytics
 )
 from services import recommendation_service
 
 # 定义 FastAPI
 app_fastapi = FastAPI()
-
+app.add_static_files('/static', 'static')
 
 # --- 公共工具函数 ---
 
@@ -127,6 +128,12 @@ def admin_crew():
     admin_header()
     crew_management.create_crew_page()
 
+@ui.page('/admin/analytics')
+def admin_analytics_page():
+    if not check_admin_access(): return
+    admin_header()
+    admin_analytics.create_analytics_page()
+
 
 # --- 3. 前台首页路由 ---
 @ui.page('/')
@@ -153,6 +160,10 @@ def page_user_ratings():
 def handle_startup():
     print("🚀 系统启动中...")
     recommendation_service.load_model()
+
+@ui.page('/movie/{tconst}')
+def movie_detail_route(tconst: str):
+    movie_detail.create_detail_page(tconst)
 
 app.on_startup(handle_startup)
 
