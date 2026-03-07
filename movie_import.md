@@ -32,18 +32,6 @@ CREATE TABLE title_basics (
     genres TEXT                -- comma-separated list
 );
 
--- -- 3. title.akas.tsv
--- DROP TABLE IF EXISTS title_akas;
--- CREATE TABLE title_akas (
---     titleId TEXT,
---     ordering INT,
---     title TEXT,
---     region TEXT,
---     language TEXT,
---     types TEXT,                -- comma-separated list
---     attributes TEXT,           -- comma-separated list
---     isOriginalTitle INT
--- );
 
 -- 4. title.crew.tsv
 DROP TABLE IF EXISTS title_crew;
@@ -62,16 +50,6 @@ CREATE TABLE title_episode (
     episodeNumber INT
 );
 
--- -- 6. title.principals.tsv
--- DROP TABLE IF EXISTS title_principals;
--- CREATE TABLE title_principals (
---     tconst TEXT,
---     ordering INT,
---     nconst TEXT,
---     category TEXT,
---     job TEXT,
---     characters TEXT
--- );
 
 -- 7. title.ratings.tsv
 DROP TABLE IF EXISTS title_ratings;
@@ -97,9 +75,6 @@ PGPASSWORD=password psql -U postgresuser -h localhost -d movie_db
 WITH (FORMAT csv, DELIMITER E'\t', NULL '\N', HEADER true, QUOTE E'\b');
 
 \COPY title_basics FROM '/home/wly/movie_data/title.basics.tsv'
-WITH (FORMAT csv, DELIMITER E'\t', NULL '\N', HEADER true, QUOTE E'\b');
-
-\COPY title_akas FROM '/home/wly/movie_data/title.akas.tsv'
 WITH (FORMAT csv, DELIMITER E'\t', NULL '\N', HEADER true, QUOTE E'\b');
 
 \COPY title_crew FROM '/home/wly/movie_data/title.crew.tsv'
