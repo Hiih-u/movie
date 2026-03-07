@@ -84,7 +84,7 @@ def analyze_text_mood(text: str):
         top_score = result['scores'][0]
 
         print(f"🤖 AI 分析结果: '{text}' -> {top_label} (置信度: {top_score:.2f})")
-        if top_score < 0.3:
+        if top_score < 0.2:
             return None
         return labels_map.get(top_label)
     except Exception as e:
