@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  movie_db:
+    image: postgres:18
+    container_name: movie_postgres
+    restart: always
+    environment:
+      # 数据库名称
+      - POSTGRES_DB=movie_db
+      # 用户名
+      - POSTGRES_USER=postgresuser
+      # 密码
+      - POSTGRES_PASSWORD=password
+      # 设置系统时区为中国标准时间
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - movie_network
+
+networks:
+  movie_network:
+    driver: bridge
