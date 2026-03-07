@@ -9,11 +9,6 @@ export PGPASSWORD="password"
 # 定义按顺序排列的文件列表
 FILES=(
     "users.sql"
-    "title_basics.sql"
-    "name_basics.sql"
-    "title_ratings.sql"
-    "title_crew.sql"
-    "title_episode.sql"
     "movie_box_office.sql"
     "user_favorites.sql"
     "user_personal_ratings.sql"
