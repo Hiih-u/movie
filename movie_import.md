@@ -14,8 +14,8 @@ CREATE TABLE name_basics (
     primaryName TEXT,
     birthYear INT,
     deathYear INT,
-    primaryProfession TEXT,   -- comma-separated list
-    knownForTitles TEXT       -- comma-separated list
+    primaryProfession TEXT, 
+    knownForTitles TEXT  
 );
 
 -- 2. title.basics.tsv
@@ -29,19 +29,19 @@ CREATE TABLE title_basics (
     startYear INT,
     endYear INT,
     runtimeMinutes INT,
-    genres TEXT                -- comma-separated list
+    genres TEXT
 );
 
 
--- 4. title.crew.tsv
+-- 3. title.crew.tsv
 DROP TABLE IF EXISTS title_crew;
 CREATE TABLE title_crew (
     tconst TEXT PRIMARY KEY,
-    directors TEXT,            -- comma-separated list (nconst)
-    writers TEXT               -- comma-separated list (nconst)
+    directors TEXT,         
+    writers TEXT           
 );
 
--- 5. title.episode.tsv
+-- 4. title.episode.tsv
 DROP TABLE IF EXISTS title_episode;
 CREATE TABLE title_episode (
     tconst TEXT PRIMARY KEY,
@@ -51,7 +51,7 @@ CREATE TABLE title_episode (
 );
 
 
--- 7. title.ratings.tsv
+-- 5. title.ratings.tsv
 DROP TABLE IF EXISTS title_ratings;
 CREATE TABLE title_ratings (
     tconst TEXT PRIMARY KEY,
@@ -85,4 +85,4 @@ WITH (FORMAT csv, DELIMITER E'\t', NULL '\N', HEADER true, QUOTE E'\b');
 
 \COPY title_ratings FROM '/home/wly/movie_data/title.ratings.tsv'
 WITH (FORMAT csv, DELIMITER E'\t', NULL '\N', HEADER true, QUOTE E'\b');
-``
+```
