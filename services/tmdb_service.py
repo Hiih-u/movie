@@ -77,7 +77,7 @@ async def get_movie_info(tconst: str):
             "writers": writers_names
         }
 
-        # --- 3. 检查是否需要更新 (保持原有逻辑) ---
+        # --- 3. 检查是否需要更新  ---
         if movie.poster_path and movie.overview:
             print(f"✅ [TMDB] 命中本地缓存")
             return info
