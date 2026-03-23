@@ -39,7 +39,7 @@ async def fetch_mojo_box_office(client, tconst):
         spans = performance_div.find_all('span', class_='money')
         if not spans: return None
 
-        # 简单策略：取最大的那个数字作为全球总票房
+        # 提取货币格式字符串并清洗为整数
         max_money = 0
         for span in spans:
             text = span.get_text().strip().replace('$', '').replace(',', '')
