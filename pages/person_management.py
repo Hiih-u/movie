@@ -15,9 +15,9 @@ def create_person_page():
             .props('flat align=left no-caps q-pa-md')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
-            ui.button('仪表盘', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
+            ui.button('数据总览', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
                 'flat')
-            ui.button('数据统计', icon='analytics', on_click=lambda: ui.navigate.to('/admin/analytics')).classes(
+            ui.button('数据可视化', icon='analytics', on_click=lambda: ui.navigate.to('/admin/analytics')).classes(
                 'w-full').props('flat')
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')

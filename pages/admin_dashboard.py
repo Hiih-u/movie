@@ -12,8 +12,8 @@ def create_admin_page():
             .props('flat align=left no-caps q-pa-md')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
-            ui.button('仪表盘', icon='dashboard').classes('w-full shadow-sm bg-white text-primary').props('flat')
-            ui.button('数据统计', icon='analytics', on_click=lambda: ui.navigate.to('/admin/analytics')).classes(
+            ui.button('数据总览', icon='dashboard').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            ui.button('数据可视化', icon='analytics', on_click=lambda: ui.navigate.to('/admin/analytics')).classes(
                 'w-full').props('flat')
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')
@@ -125,7 +125,7 @@ def create_admin_page():
                         fig2.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=220)
                         ui.plotly(fig2).classes('w-full')
 
-                ui.notify('仪表盘已更新', type='positive')
+                ui.notify('数据总览已更新', type='positive')
 
             except Exception as e:
                 ui.notify(f'加载失败: {e}', type='negative')

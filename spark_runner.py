@@ -1,102 +1,124 @@
-import sys
 import os
+import time
 import pandas as pd
 from sqlalchemy import create_engine, text
 from pyspark.sql import SparkSession
 from pyspark.ml.recommendation import ALS
+from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.feature import StringIndexer, IndexToString
 from pyspark.sql.functions import col, explode
 
-# --- 配置数据库连接 ---
+# --- 配置区 ---
 DATABASE_URL = "postgresql+psycopg2://postgresuser:password@localhost:5432/movie_db"
 
-def run_spark_job():
-    print("🚀 [Step 1] 初始化 Spark 引擎...")
-    # 启动 Spark Session (配置内存使用)
+
+def log(message):
+    """自定义带时间戳的日志输出"""
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+
+
+def run_recommendation_pipeline():
+    # 1. 初始化 Spark
+    log("🚀 正在启动 Spark Session...")
     spark = SparkSession.builder \
-        .appName("MovieRec_ALS_Engine") \
-        .config("spark.driver.memory", "2g") \
+        .appName("Movie_Recommendation_ALS_Offline") \
+        .config("spark.driver.memory", "4g") \
         .master("local[*]") \
         .getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
 
-    spark.sparkContext.setLogLevel("ERROR")  # 减少日志干扰
-
-    print("📥 [Step 2] 从数据库加载评分数据...")
-    # 使用 Pandas 读取数据库 (适合千万级以下数据，超大数据需用 JDBC)
+    # 2. 数据摄取
+    log("📥 从 PostgreSQL 提取评分数据...")
     engine = create_engine(DATABASE_URL)
-
-    # 读取用户评分表 (user_id, tconst, rating)
-    # 注意：ALS 需要 user_id 和 item_id 都是数字！
-    # 如果你的 tconst 是 'tt001' 这种字符串，我们需要用 StringIndexer 转成数字，
-    # 或者为了简单，这里假设我们只用 user_id (int) 和 rating
     query = "SELECT user_id, tconst, rating FROM user_personal_ratings"
     pdf_ratings = pd.read_sql(query, engine)
 
     if pdf_ratings.empty:
-        print("❌ 数据库没有评分数据，请先生成数据 (seed_ratings.py)")
+        log("⚠️ 警告：评分数据集为空，流程终止。")
         return
 
-    # Pandas DF -> Spark DF
     ratings_df = spark.createDataFrame(pdf_ratings)
+    log(f"✅ 成功加载 {ratings_df.count()} 条评分记录。")
 
-    # --- 关键处理：因为 tconst 是字符串，ALS 只能吃数字 ---
-    # 我们需要给 tconst 编个号 (String -> Index)
-    from pyspark.ml.feature import StringIndexer
+    # 3. 特征工程 (StringIndexer)
+    log("🔧 正在进行特征编码 (tconst -> index)...")
+    string_indexer = StringIndexer(inputCol="tconst", outputCol="movie_idx")
+    indexer_model = string_indexer.fit(ratings_df)
+    indexed_ratings = indexer_model.transform(ratings_df)
 
-    indexer = StringIndexer(inputCol="tconst", outputCol="movie_id_int")
-    indexer_model = indexer.fit(ratings_df)
-    ratings_df = indexer_model.transform(ratings_df)
+    # 4. 划分训练集与测试集 (80/20)
+    # 这是计算 RMSE 的核心环节
+    (training, test) = indexed_ratings.randomSplit([0.8, 0.2], seed=42)
+    log(f"📊 数据划分完成：训练集 {training.count()} 条，测试集 {test.count()} 条。")
 
-    print("🧠 [Step 3] 运行 ALS 协同过滤算法...")
-    # ALS 参数配置
+    # 5. 模型训练
+    log("🎬 正在训练 ALS 协同过滤模型...")
     als = ALS(
-        maxIter=10,
-        regParam=0.1,
+        rank=4,  # 增加一点维度提升拟合能力
+        maxIter=15,
+        regParam=0.5,
         userCol="user_id",
-        itemCol="movie_id_int",
+        itemCol="movie_idx",
         ratingCol="rating",
         coldStartStrategy="drop",
         nonnegative=True
     )
+    model = als.fit(training)
+    log("✅ 模型拟合完成。")
 
-    model = als.fit(ratings_df)
+    # 6. 模型评估 (RMSE)
+    log("🧪 正在计算模型评估指标 (RMSE)...")
+    predictions = model.transform(test)
+    evaluator = RegressionEvaluator(
+        metricName="rmse",
+        labelCol="rating",
+        predictionCol="prediction"
+    )
+    rmse = evaluator.evaluate(predictions)
 
-    print("🔮 [Step 4] 为所有用户生成 Top 10 推荐...")
-    # 给每个人推荐 10 部
+    # 均方根误差公式：$RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$
+    log(f"📢 当前模型 RMSE = {rmse:.4f}")
+
+    if rmse > 1.2:
+        log("⚠️ 注意：RMSE 指标偏高，建议调整 rank 或 regParam 参数，或检查原始数据噪声。")
+    else:
+        log("✨ 提示：模型性能表现良好。")
+
+    # 7. 生成全局推荐
+    log("🎯 正在为所有用户生成 Top-10 推荐清单...")
     user_recs = model.recommendForAllUsers(10)
 
-    # 结果格式处理：将数组炸开 (Explode)
-    # 原始: [User: 1, Recs: [(Movie: 101, Score: 4.5), ...]]
-    # 目标: User: 1, Movie: 101, Score: 4.5
+    # 8. 逆向还原索引与数据平铺
+    log("🔄 正在还原影视 ID 并格式化结果...")
     recs_exploded = user_recs.select(
         col("user_id"),
         explode("recommendations").alias("rec")
     ).select(
         col("user_id"),
-        col("rec.movie_id_int"),
+        col("rec.movie_idx").alias("movie_idx"),
         col("rec.rating").alias("score")
     )
 
-    # --- 将数字 ID 转回 tconst 字符串 ---
-    # 利用之前的 indexer 逆向转换
-    from pyspark.ml.feature import IndexToString
-    converter = IndexToString(inputCol="movie_id_int", outputCol="tconst", labels=indexer_model.labels)
-    final_recs = converter.transform(recs_exploded).select("user_id", "tconst", "score")
+    id_converter = IndexToString(
+        inputCol="movie_idx",
+        outputCol="tconst",
+        labels=indexer_model.labels
+    )
+    final_recommendations = id_converter.transform(recs_exploded).select("user_id", "tconst", "score")
 
-    print("💾 [Step 5] 结果存回数据库 (spark_recommendations 表)...")
-    # Spark DF -> Pandas DF
-    result_pdf = final_recs.toPandas()
+    # 9. 结果入库
+    log("💾 正在同步结果至数据库 (spark_recommendations)...")
+    result_pdf = final_recommendations.toPandas()
 
-    # 写入数据库 (先清空旧结果，再写入新结果)
     with engine.connect() as conn:
-        conn.execute(text("TRUNCATE TABLE spark_recommendations"))  # 清空
+        conn.execute(text("TRUNCATE TABLE spark_recommendations"))
         conn.commit()
 
-    # 批量写入
     result_pdf.to_sql('spark_recommendations', engine, if_exists='append', index=False)
 
-    print(f"✅ 成功！已保存 {len(result_pdf)} 条推荐记录。")
+    log(f"🏁 离线任务全部完成！已更新 {len(result_pdf)} 条个性化推荐记录。")
     spark.stop()
 
 
 if __name__ == "__main__":
-    run_spark_job()
+    run_recommendation_pipeline()

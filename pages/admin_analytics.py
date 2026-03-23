@@ -10,10 +10,10 @@ def render_sidebar():
             .props('flat align=left no-caps q-pa-md')
         ui.separator()
         with ui.column().classes('w-full q-pa-sm'):
-            ui.button('仪表盘', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
+            ui.button('数据总览', icon='dashboard', on_click=lambda: ui.navigate.to('/admin')).classes('w-full').props(
                 'flat')
             # --- 高亮当前页 ---
-            ui.button('数据统计', icon='analytics').classes('w-full shadow-sm bg-white text-primary').props('flat')
+            ui.button('数据可视化', icon='analytics').classes('w-full shadow-sm bg-white text-primary').props('flat')
             ui.button('用户管理', icon='people', on_click=lambda: ui.navigate.to('/admin/users')).classes(
                 'w-full').props('flat')
             ui.button('演职人员', icon='badge', on_click=lambda: ui.navigate.to('/admin/people')).classes(
@@ -77,7 +77,7 @@ def create_analytics_page():
         with ui.row().classes('w-full q-mb-lg'):
             # height='600px' 给足空间
             chart_card(
-                title='💰 商业价值与艺术口碑关联分析 (ROI Bubble Chart)',
+                title='💰 票房与评分气泡图',
                 filename='roi_bubble.html',
                 height='710px',
                 color='indigo'
@@ -86,21 +86,21 @@ def create_analytics_page():
         # --- 第一行：题材与评分 (左右布局) ---
         with ui.row().classes('w-full gap-6 q-mb-md'):
             with ui.column().classes('flex-1'):
-                chart_card('🌸 题材偏好 (Rose Chart)', 'genre_rose.html', color='pink')
+                chart_card('🌸 题材占比玫瑰图', 'genre_rose.html', color='pink')
             with ui.column().classes('flex-1'):
-                chart_card('🎻 评分分布 (Box Plot)', 'rating_box.html', color='purple')
+                chart_card('🎻 评分分布箱型图', 'rating_box.html', color='purple')
 
         # --- 第二行：时代演变 (通栏) ---
         with ui.row().classes('w-full q-mb-md'):
-            chart_card('🔥 电影类型的时代变迁 (Heatmap)', 'evolution_heatmap.html', height='500px', color='orange')
+            chart_card('🔥 题材变迁热力图', 'evolution_heatmap.html', height='500px', color='orange')
 
         # --- 第三行：质量与热度 (通栏) ---
         with ui.row().classes('w-full q-mb-md'):
-            chart_card('✨ 经典神作挖掘机 (Scatter Plot)', 'quality_scatter.html', height='600px', color='blue')
+            chart_card('✨ 评分与热度散点图', 'quality_scatter.html', height='600px', color='blue')
 
         # --- 第四行：中西对比 (通栏) ---
         with ui.row().classes('w-full q-mb-md'):
-            chart_card('🌏 中西审美差异 (Douban vs IMDb)', 'culture_compare.html', height='600px', color='teal')
+            chart_card('🌏 不同平台评分对比图', 'culture_compare.html', height='600px', color='teal')
 
         ui.label('注：图表数据来自本地 /static/charts 缓存，请定期点击右上角更新。').classes(
             'text-xs text-slate-400 q-mt-xl')

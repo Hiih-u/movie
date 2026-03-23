@@ -196,7 +196,7 @@ python init/seed_ratings.py
 ```
 
 
-5. **生成图表缓存** (用于后台仪表盘展示):
+5. **生成图表缓存** (用于后台数据总览展示):
 ```bash
 python init/generate_charts.py
 
@@ -226,7 +226,7 @@ python spark_runner.py
 
 生成 Item-Based CF 所需的相似度矩阵（基于内存）。
 
-* 登录后台 -> **仪表盘** -> 点击 **“立即重新训练”**。
+* 登录后台 -> **数据总览** -> 点击 **“立即重新训练”**。
 * 或者直接在代码中调用 `services.recommendation_service.train_model()`。
 
 ---
