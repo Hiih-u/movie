@@ -116,8 +116,8 @@ async def generate_all_charts():
         print(f"❌ 热力图生成失败: {e}")
 
 
-    # --- 图表 4: 质量热度散点图---
-    print("🎨 正在生成: 质量热度 (quality_scatter.html)...")
+    # --- 图表 4: 评分与热度散点图---
+    print("🎨 正在生成: 评分与热度 (quality_scatter.html)...")
     try:
         scatter_data = await analysis_service.get_scatter_data()
         if scatter_data:

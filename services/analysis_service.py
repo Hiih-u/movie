@@ -302,7 +302,7 @@ async def get_genre_evolution(limit=10000):
 
 
 async def get_scatter_data(limit=2000):
-    """4. 质量与热度 (散点图数据)"""
+    """4. 评分与热度 (散点图数据)"""
     async with AsyncSessionLocal() as db:
         stmt = (
             select(TitleBasics.primaryTitle, TitleRatings.averageRating, TitleRatings.numVotes, TitleBasics.genres)
@@ -323,7 +323,7 @@ async def get_scatter_data(limit=2000):
 
 
 async def get_cultural_comparison():
-    """5. 中西审美差异 (双向柱状图)"""
+    """5. 不同平台评分对比图 (双向柱状图)"""
     async with AsyncSessionLocal() as db:
         # 连接 DoubanTop250 和 TitleRatings
         # 注意：这需要 DoubanTop250 表里的 imdb_id 字段有值
