@@ -280,15 +280,12 @@ async def get_genre_evolution(limit=10000):
                         data.append({'decade': decade, 'genre': g})
 
         if not data: return [], [], []
-
         df = pd.DataFrame(data)
         # 聚合计数
         pivot = df.groupby(['decade', 'genre']).size().reset_index(name='count')
-
         # 筛选主要类型
         top_genres = pivot.groupby('genre')['count'].sum().nlargest(10).index
         pivot = pivot[pivot['genre'].isin(top_genres)]
-
         # 格式化为 Plotly Heatmap 需要的格式
         # x: decades, y: genres, z: counts matrix
         years = sorted(pivot['decade'].unique())
@@ -305,7 +302,7 @@ async def get_genre_evolution(limit=10000):
 
 
 async def get_scatter_data(limit=2000):
-    """4. 质量与热度 (散点图数据)"""
+    """4. 评分与热度 (散点图数据)"""
     async with AsyncSessionLocal() as db:
         stmt = (
             select(TitleBasics.primaryTitle, TitleRatings.averageRating, TitleRatings.numVotes, TitleBasics.genres)
@@ -326,7 +323,7 @@ async def get_scatter_data(limit=2000):
 
 
 async def get_cultural_comparison():
-    """5. 中西审美差异 (双向柱状图)"""
+    """5. 不同平台评分对比图 (双向柱状图)"""
     async with AsyncSessionLocal() as db:
         # 连接 DoubanTop250 和 TitleRatings
         # 注意：这需要 DoubanTop250 表里的 imdb_id 字段有值
@@ -356,7 +353,7 @@ async def get_cultural_comparison():
         return [{'title': r[0], 'douban': r[1], 'imdb': r[2]} for r in data]
 
 
-async def get_roi_scatter_data(limit=1000):
+async def get_roi_scatter_data(limit=600):
     """
     【新增】获取 商业价值(票房) vs 艺术口碑(评分) 散点图数据
     用于生成 ROI Bubble Chart
