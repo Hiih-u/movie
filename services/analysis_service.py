@@ -280,15 +280,12 @@ async def get_genre_evolution(limit=10000):
                         data.append({'decade': decade, 'genre': g})
 
         if not data: return [], [], []
-
         df = pd.DataFrame(data)
         # 聚合计数
         pivot = df.groupby(['decade', 'genre']).size().reset_index(name='count')
-
         # 筛选主要类型
         top_genres = pivot.groupby('genre')['count'].sum().nlargest(10).index
         pivot = pivot[pivot['genre'].isin(top_genres)]
-
         # 格式化为 Plotly Heatmap 需要的格式
         # x: decades, y: genres, z: counts matrix
         years = sorted(pivot['decade'].unique())

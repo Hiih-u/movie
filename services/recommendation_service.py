@@ -148,7 +148,6 @@ async def get_recommendations(user_id: int, limit=8,category='all'):
 
     async with AsyncSessionLocal() as db:
         # 1. 获取当前用户喜欢过的电影 (评分>6 或 收藏)
-        # 这里为了简化，直接查所有评分记录
         stmt = select(UserRating).where(UserRating.user_id == user_id).order_by(UserRating.rating.desc()).limit(20)
         user_ratings = (await db.execute(stmt)).scalars().all()
 
