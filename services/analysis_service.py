@@ -353,7 +353,7 @@ async def get_cultural_comparison():
         return [{'title': r[0], 'douban': r[1], 'imdb': r[2]} for r in data]
 
 
-async def get_roi_scatter_data(limit=1000):
+async def get_roi_scatter_data(limit=600):
     """
     【新增】获取 商业价值(票房) vs 艺术口碑(评分) 散点图数据
     用于生成 ROI Bubble Chart
