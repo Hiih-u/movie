@@ -41,7 +41,7 @@ def run_recommendation_pipeline():
     log(f"✅ 成功加载 {ratings_df.count()} 条评分记录。")
 
     # 3. 特征工程 (StringIndexer)
-    log("🔧 正在进行特征编码 (tconst -> index)...")
+    log("正在进行特征编码 (tconst -> index)...")
     string_indexer = StringIndexer(inputCol="tconst", outputCol="movie_idx")
     indexer_model = string_indexer.fit(ratings_df)
     indexed_ratings = indexer_model.transform(ratings_df)
@@ -49,10 +49,10 @@ def run_recommendation_pipeline():
     # 4. 划分训练集与测试集 (80/20)
     # 这是计算 RMSE 的核心环节
     (training, test) = indexed_ratings.randomSplit([0.8, 0.2], seed=42)
-    log(f"📊 数据划分完成：训练集 {training.count()} 条，测试集 {test.count()} 条。")
+    log(f"数据划分完成：训练集 {training.count()} 条，测试集 {test.count()} 条。")
 
     # 5. 模型训练
-    log("🎬 正在训练 ALS 协同过滤模型...")
+    log("正在训练 ALS 协同过滤模型...")
     als = ALS(
         rank=4,  # 增加一点维度提升拟合能力
         maxIter=15,
@@ -64,10 +64,10 @@ def run_recommendation_pipeline():
         nonnegative=True
     )
     model = als.fit(training)
-    log("✅ 模型拟合完成。")
+    log("模型拟合完成。")
 
     # 6. 模型评估 (RMSE)
-    log("🧪 正在计算模型评估指标 (RMSE)...")
+    log("正在计算模型评估指标 (RMSE)...")
     predictions = model.transform(test)
     evaluator = RegressionEvaluator(
         metricName="rmse",
@@ -77,12 +77,12 @@ def run_recommendation_pipeline():
     rmse = evaluator.evaluate(predictions)
 
     # 均方根误差公式：$RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$
-    log(f"📢 当前模型 RMSE = {rmse:.4f}")
+    log(f"当前模型 RMSE = {rmse:.4f}")
 
     if rmse > 1.2:
-        log("⚠️ 注意：RMSE 指标偏高，建议调整 rank 或 regParam 参数，或检查原始数据噪声。")
+        log("注意：RMSE 指标偏高，建议调整 rank 或 regParam 参数，或检查原始数据噪声。")
     else:
-        log("✨ 提示：模型性能表现良好。")
+        log("提示：模型性能表现良好。")
 
     # 7. 生成全局推荐
     log("🎯 正在为所有用户生成 Top-10 推荐清单...")

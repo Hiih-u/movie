@@ -169,4 +169,4 @@ app.on_startup(handle_startup)
 
 # --- 启动配置 ---
 # 注意：storage_secret 是 Session 加密必须的
-ui.run(title='Movie System', storage_secret='jflajsdfoisaiofogklsdfl', port=61081)
+ui.run(title='Movie System', storage_secret='jflajsdfoisaiofogklsdfl', port=61081,host='0.0.0.0')

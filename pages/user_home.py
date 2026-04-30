@@ -244,7 +244,7 @@ def create_user_home():
                             'absolute -right-10 -bottom-10 text-[150px] font-black text-white opacity-5 select-none')
                         with ui.column().classes('gap-3 z-10 max-w-3xl'):
                             ui.label('基于 Python 的影视推荐系统').classes('text-4xl font-bold mb-1 tracking-wide')
-                            ui.label('千万级 IMDb 知识库，深度融合 协同过滤、情感计算 与 语义分析 技术。').classes(
+                            ui.label('千万级 IMDb 知识库，融合 协同过滤、情感识别 技术。').classes(
                                 'text-slate-200 text-lg font-medium')
                             with ui.row().classes('items-center gap-2 text-slate-400 text-sm'):
                                 ui.icon('hub', size='xs')
